@@ -57,6 +57,18 @@ const TYPE_STRUCTURES = [
 ];
 
 const PUBLIC_CATEGORIES = ["adultes", "mineurs", "petite enfance"];
+const ASSISTANT_SECTEUR_KEYWORDS = {
+  "Petite enfance": ["petite enfance", "creche", "multi-accueil", "pmi", "assistantes maternelles"],
+  "Protection de l'enfance": ["protection de l'enfance", "ase", "mecs", "aemo", "enfance"],
+  "Personnes âgées": ["ehpad", "personnes agees", "geronto", "ehpa"],
+  Handicap: ["handicap", "ime", "itep", "esat", "samsah", "savs", "mas", "fam"],
+  "Précarité/Exclusion": ["chrs", "precarite", "exclusion", "sans-abri", "maraude"],
+  "Santé mentale": ["psychiatr", "sante mentale", "cmp", "hopital de jour"],
+  Addictions: ["addiction", "csapa", "caarud"],
+  Insertion: ["insertion", "mission locale", "insertion socio"],
+  Logement: ["logement", "hebergement", "foyer d'hebergement", "residence sociale"],
+  Justice: ["pjj", "spip", "justice", "penitentiaire"],
+};
 
 const state = {
   remoteData: [],
@@ -144,6 +156,8 @@ const el = {
   otherTypeWrap: document.getElementById("otherTypeWrap"),
   otherTypeInput: document.getElementById("otherTypeInput"),
   dureeHint: document.getElementById("dureeHint"),
+  runStructureAssistant: document.getElementById("runStructureAssistant"),
+  structureAssistantStatus: document.getElementById("structureAssistantStatus"),
 };
 
 init();
@@ -153,6 +167,7 @@ function init() {
   setupStaticSelects();
   bindSearchFilters();
   bindContributionForm();
+  bindStructureAssistant();
   bindAccountActions();
   setContributionMode("experience");
   renderAccountState();
@@ -844,6 +859,97 @@ function bindContributionForm() {
       showView("detail");
     }
   });
+}
+
+function bindStructureAssistant() {
+  if (!el.runStructureAssistant) return;
+  el.runStructureAssistant.addEventListener("click", runStructureAssistant);
+}
+
+async function runStructureAssistant() {
+  const nomStructure = clean(el.contribForm.elements.nomStructure?.value);
+  const ville = clean(el.contribForm.elements.ville?.value);
+  const departement = clean(el.contribForm.elements.departement?.value);
+  if (!nomStructure) {
+    if (el.structureAssistantStatus) {
+      el.structureAssistantStatus.textContent = "Renseignez au moins le nom de la structure pour lancer la recherche.";
+      el.structureAssistantStatus.className = "mt-2 text-xs text-red-300";
+    }
+    return;
+  }
+
+  if (el.structureAssistantStatus) {
+    el.structureAssistantStatus.textContent = "Recherche en cours...";
+    el.structureAssistantStatus.className = "mt-2 text-xs text-indigo-200";
+  }
+
+  const query = [nomStructure, ville, departement].filter(Boolean).join(" ");
+  const [wikiRes, ddgRes, addrRes] = await Promise.allSettled([
+    fetchJson(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json&origin=*`),
+    fetchJson(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&no_redirect=1&skip_disambig=1`),
+    fetchJson(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=1`),
+  ]);
+
+  const wikiText = wikiRes.status === "fulfilled"
+    ? (wikiRes.value?.query?.search || []).slice(0, 2).map((item) => `${item?.title || ""} ${item?.snippet || ""}`).join(" ")
+    : "";
+  const ddgText = ddgRes.status === "fulfilled"
+    ? `${ddgRes.value?.Heading || ""} ${ddgRes.value?.AbstractText || ""}`
+    : "";
+  const combined = normalizeForSearch(`${wikiText} ${ddgText}`);
+
+  const suggestions = {};
+
+  if (!clean(el.contribForm.elements.typeStructure?.value)) {
+    const foundType = TYPE_STRUCTURES.find((type) => combined.includes(normalizeForSearch(type)));
+    if (foundType) suggestions.typeStructure = foundType;
+  }
+
+  if (!clean(el.contribForm.elements.secteur?.value)) {
+    const foundSecteur = Object.entries(ASSISTANT_SECTEUR_KEYWORDS).find(([, keywords]) =>
+      keywords.some((keyword) => combined.includes(normalizeForSearch(keyword)))
+    )?.[0];
+    if (foundSecteur) suggestions.secteur = foundSecteur;
+  }
+
+  if (addrRes.status === "fulfilled" && addrRes.value?.features?.length) {
+    const props = addrRes.value.features[0].properties || {};
+    if (!clean(el.contribForm.elements.ville?.value) && props.city) suggestions.ville = clean(props.city);
+    if (!clean(el.contribForm.elements.departement?.value) && props.postcode) suggestions.departement = clean(props.postcode).slice(0, 2);
+  }
+
+  if (suggestions.typeStructure) {
+    el.contribForm.elements.typeStructure.value = suggestions.typeStructure;
+    el.otherTypeWrap.classList.toggle("hidden", suggestions.typeStructure !== "Autre");
+    el.otherTypeInput.required = suggestions.typeStructure === "Autre";
+  }
+  if (suggestions.secteur) {
+    el.contribForm.elements.secteur.value = suggestions.secteur;
+    setupContribPublicFilter(el.contribPublic, suggestions.secteur);
+    if (!clean(el.contribForm.elements.typePublic?.value)) {
+      const publics = SECTEUR_PUBLICS[suggestions.secteur] || [];
+      if (publics.length === 1) el.contribForm.elements.typePublic.value = publics[0];
+    }
+  }
+  if (suggestions.ville) el.contribForm.elements.ville.value = suggestions.ville;
+  if (suggestions.departement) el.contribForm.elements.departement.value = suggestions.departement;
+
+  const changedFields = Object.keys(suggestions);
+  if (el.structureAssistantStatus) {
+    if (!changedFields.length) {
+      el.structureAssistantStatus.textContent = "Aucune suggestion fiable trouvée. Vérifiez manuellement.";
+      el.structureAssistantStatus.className = "mt-2 text-xs text-slate-300";
+    } else {
+      el.structureAssistantStatus.textContent = `Suggestions appliquées: ${changedFields.join(", ")}. Vérifiez avant d'enregistrer.`;
+      el.structureAssistantStatus.className = "mt-2 text-xs text-emerald-300";
+    }
+  }
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
 }
 
 function validateContributionForm({ mode, data, postes, baseRecord }) {

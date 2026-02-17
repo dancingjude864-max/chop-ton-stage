@@ -308,6 +308,17 @@
         <form id="contribForm" class="space-y-8" novalidate>
           <fieldset id="contribStructureDetails" class="space-y-4">
             <legend class="mb-2 text-lg font-bold">Informations sur la structure</legend>
+            <div class="rounded-xl border border-indigo-300/35 bg-slate-950/45 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-indigo-200">Assistant web (beta)</p>
+                <button id="runStructureAssistant" type="button" class="rounded-lg border border-indigo-300/45 px-3 py-1 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10">
+                  Compléter automatiquement
+                </button>
+              </div>
+              <p id="structureAssistantStatus" class="mt-2 text-xs text-slate-300">
+                Le robot propose des compléments depuis des sources publiques. Vérifiez toujours avant d'enregistrer.
+              </p>
+            </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <label class="text-sm font-medium">Nom de la structure *
                 <input required name="nomStructure" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
