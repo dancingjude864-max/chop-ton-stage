@@ -1114,7 +1114,7 @@ function renderResults() {
   el.resultMeta.textContent = `${filtered.length} structure(s) (${filteredEntries} entrée(s) contacts) sur ${structureGroups.length} structure(s) (${totalEntries} entrée(s) contacts).`;
 
   if (filtered.length === 0) {
-    el.results.innerHTML = '<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Aucun résultat pour ces filtres.</div>';
+    el.results.innerHTML = '<div class="rounded-xl border border-indigo-400/30 bg-slate-900/70 p-4 text-sm text-slate-300">Aucun résultat pour ces filtres.</div>';
     if (!el.personalView.classList.contains("hidden")) renderPersonalView();
     return;
   }
@@ -1126,10 +1126,10 @@ function renderResults() {
 function renderCard(item) {
   const structure = item.primary;
   const tags = [
-    badge(structure.typeStructure, "bg-cyan-100 text-cyan-800"),
-    badge(structure.secteur, "bg-amber-100 text-amber-800"),
-    badge(structure.typePublic, "bg-emerald-100 text-emerald-800"),
-    badge(structure.diplome, "bg-fuchsia-100 text-fuchsia-800"),
+    badge(structure.typeStructure, "bg-cyan-500/20 text-cyan-200"),
+    badge(structure.secteur, "bg-violet-500/20 text-violet-200"),
+    badge(structure.typePublic, "bg-emerald-500/20 text-emerald-200"),
+    badge(structure.diplome, "bg-fuchsia-500/20 text-fuchsia-200"),
   ]
     .filter(Boolean)
     .join("");
@@ -1137,14 +1137,14 @@ function renderCard(item) {
   return `
     <article
       data-structure-id="${escapeHtml(item.id)}"
-      class="structure-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-cyan-300 hover:shadow-md cursor-pointer"
+      class="structure-card rounded-2xl border border-indigo-400/30 bg-slate-900/70 p-4 shadow-sm transition hover:border-violet-400/60 hover:shadow-md cursor-pointer"
     >
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 class="text-lg font-bold text-slate-900">${escapeHtml(structure.nomStructure)}</h3>
-          <p class="text-sm text-slate-600">${escapeHtml(structure.association || "Association/Fondation non renseignée")}</p>
+          <h3 class="text-lg font-bold text-slate-100">${escapeHtml(structure.nomStructure)}</h3>
+          <p class="text-sm text-slate-300">${escapeHtml(structure.association || "Association/Fondation non renseignée")}</p>
         </div>
-        <span class="rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600">${escapeHtml(item.sourceSummary)}</span>
+        <span class="rounded-full border border-indigo-400/40 px-2 py-1 text-xs text-indigo-200">${escapeHtml(item.sourceSummary)}</span>
       </div>
 
       <div class="mt-3 flex flex-wrap gap-2">${tags}</div>
@@ -1157,7 +1157,7 @@ function renderCard(item) {
         </div>
       </div>
 
-      <div class="mt-4 grid gap-2 text-sm text-slate-700">
+      <div class="mt-4 grid gap-2 text-sm text-slate-200">
         ${paragraph("Missions", structure.missions)}
         ${paragraph("Ambiance", structure.ambiance)}
         ${paragraph("Conseils", structure.conseils)}
@@ -1411,15 +1411,15 @@ function openStructureDetail(structureId) {
     el.detailTrackingControls.innerHTML = "";
     el.detailContacts.innerHTML = "";
     el.detailExperiences.innerHTML =
-      '<div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Aucune expérience disponible.</div>';
+      '<div class="rounded-xl border border-indigo-400/30 bg-slate-900/70 p-3 text-sm text-slate-300">Aucune expérience disponible.</div>';
     return;
   }
 
   const badges = [
-    badge(record.typeStructure, "bg-cyan-100 text-cyan-800"),
-    badge(record.secteur, "bg-amber-100 text-amber-800"),
-    badge(record.typePublic, "bg-emerald-100 text-emerald-800"),
-    badge(record.diplome, "bg-fuchsia-100 text-fuchsia-800"),
+    badge(record.typeStructure, "bg-cyan-500/20 text-cyan-200"),
+    badge(record.secteur, "bg-violet-500/20 text-violet-200"),
+    badge(record.typePublic, "bg-emerald-500/20 text-emerald-200"),
+    badge(record.diplome, "bg-fuchsia-500/20 text-fuchsia-200"),
   ]
     .filter(Boolean)
     .join("");

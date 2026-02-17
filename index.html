@@ -5,38 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CHOP' TON STAGE</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .panel input,
+      .panel select,
+      .panel textarea {
+        background: rgba(15, 23, 42, 0.9);
+        border-color: rgba(129, 140, 248, 0.45);
+        color: #e2e8f0;
+      }
+      .panel input::placeholder,
+      .panel textarea::placeholder {
+        color: #94a3b8;
+      }
+    </style>
   </head>
-  <body class="min-h-screen bg-gradient-to-b from-amber-50 via-white to-cyan-50 text-slate-900">
+  <body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-slate-100">
     <button
       id="goSpreadsheet"
-      class="fixed right-4 top-4 z-20 rounded-lg border border-slate-300 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-100"
+      class="fixed right-4 top-4 z-20 rounded-lg border border-indigo-400/40 bg-slate-900/90 px-3 py-2 text-xs font-semibold text-indigo-200 shadow shadow-indigo-900/40 hover:bg-slate-800"
     >
       Tableur
     </button>
 
     <header class="mx-auto max-w-6xl px-4 pt-12 pb-4 sm:px-6">
       <div class="mb-4 flex justify-end gap-2">
-        <button id="goPersonal" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
+        <button id="goPersonal" class="rounded-lg border border-indigo-400/40 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 hover:bg-slate-800">
           Mon espace
         </button>
-        <button id="goAccount" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
+        <button id="goAccount" class="rounded-lg border border-indigo-400/40 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 hover:bg-slate-800">
           Compte
         </button>
       </div>
-      <h1 class="text-center text-5xl font-black tracking-tight text-cyan-900 sm:text-7xl">
+      <h1 class="text-center text-5xl font-black tracking-tight text-indigo-200 sm:text-7xl">
         CHOP' TON STAGE
       </h1>
-      <p class="mx-auto mt-4 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
+      <p class="mx-auto mt-4 max-w-2xl text-center text-sm text-slate-300 sm:text-base">
         Plateforme collaborative pour trouver un stage en travail social.
       </p>
     </header>
 
     <main class="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
-      <section id="homeView" class="mx-auto flex min-h-[56vh] max-w-5xl flex-col justify-center rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+      <section id="homeView" class="mx-auto flex min-h-[56vh] max-w-5xl flex-col justify-center p-2 sm:p-4">
         <div class="grid w-full gap-4 md:grid-cols-3">
           <button
             id="goSearch"
-            class="rounded-2xl border border-cyan-200 bg-cyan-600 px-4 py-6 text-center text-white transition hover:bg-cyan-700"
+            class="rounded-2xl border border-cyan-400/40 bg-cyan-500/90 px-4 py-6 text-center text-white transition hover:bg-cyan-400"
           >
             <span class="block text-lg font-bold">Chercher un stage</span>
             <span id="structureCount" class="mt-2 block text-sm text-cyan-100">Chargement des structures...</span>
@@ -44,7 +57,7 @@
 
           <button
             id="goContribute"
-            class="rounded-2xl border border-amber-200 bg-amber-500 px-4 py-6 text-center text-white transition hover:bg-amber-600"
+            class="rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/90 px-4 py-6 text-center text-white transition hover:bg-fuchsia-400"
           >
             <span class="block text-lg font-bold">Partager mon expérience</span>
             <span class="mt-2 block text-sm text-amber-100">Ajouter un retour d'expérience étudiant</span>
@@ -52,21 +65,21 @@
 
           <button
             id="goAddStructure"
-            class="rounded-2xl border border-emerald-200 bg-emerald-600 px-4 py-6 text-center text-white transition hover:bg-emerald-700"
+            class="rounded-2xl border border-violet-400/40 bg-violet-500/90 px-4 py-6 text-center text-white transition hover:bg-violet-400"
           >
             <span class="block text-lg font-bold">Renseigner une structure</span>
             <span class="mt-2 block text-sm text-emerald-100">Ajouter une nouvelle structure au site</span>
           </button>
         </div>
 
-        <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600">
+        <div class="mt-6 rounded-xl border border-indigo-400/30 bg-slate-900/70 p-4 text-center text-sm text-slate-300">
           <p>
             Données chargées depuis un CSV publié (Google Sheet) + contributions étudiantes partagées.
           </p>
         </div>
       </section>
 
-      <section id="searchView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+      <section id="searchView" class="panel hidden rounded-3xl border border-indigo-400/30 bg-slate-900/70 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <div class="mb-5 flex flex-wrap gap-2">
           <button id="backFromSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
             Retour accueil
@@ -127,7 +140,7 @@
         <div id="results" class="mt-4 grid gap-4"></div>
       </section>
 
-      <section id="detailView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+      <section id="detailView" class="panel hidden rounded-3xl border border-indigo-400/30 bg-slate-900/70 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <div class="mb-5 flex flex-wrap gap-2">
           <button id="detailToSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
             Retour à la recherche
@@ -167,7 +180,7 @@
         </div>
       </section>
 
-      <section id="personalView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+      <section id="personalView" class="panel hidden rounded-3xl border border-indigo-400/30 bg-slate-900/70 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <div class="mb-5 flex flex-wrap gap-2">
           <button id="backFromPersonal" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
             Retour accueil
@@ -187,7 +200,7 @@
         </div>
       </section>
 
-      <section id="connectedView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+      <section id="connectedView" class="panel hidden rounded-3xl border border-indigo-400/30 bg-slate-900/70 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <h2 class="text-2xl font-black text-cyan-900">Connexion réussie</h2>
         <p id="connectedPseudo" class="mt-2 text-sm text-slate-700"></p>
         <div class="mt-5 flex flex-wrap gap-3">
@@ -200,7 +213,7 @@
         </div>
       </section>
 
-      <section id="accountView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+      <section id="accountView" class="panel hidden rounded-3xl border border-indigo-400/30 bg-slate-900/70 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <div class="mb-5 flex flex-wrap gap-2">
           <button id="backFromAccount" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
             Retour accueil
@@ -255,7 +268,7 @@
         </div>
       </section>
 
-      <section id="contribView" class="hidden rounded-3xl border border-amber-100 bg-white/90 p-5 shadow-lg shadow-amber-100 sm:p-8">
+      <section id="contribView" class="panel hidden rounded-3xl border border-indigo-400/30 bg-slate-900/70 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <div class="mb-5">
           <button id="backFromContrib" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
             Retour accueil
