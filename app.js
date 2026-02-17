@@ -1120,12 +1120,18 @@ function renderResults() {
 
   const filtered = structureGroups.filter((group) => {
     const item = group.primary;
-    const passType = !typeStructure || item.typeStructure.toLowerCase() === typeStructure;
-    const passSecteur = !secteur || item.secteur.toLowerCase() === secteur;
-    const itemPublicCategories = classifyPublicCategories(item.typePublic);
+    const itemType = clean(item?.typeStructure).toLowerCase();
+    const itemSecteur = clean(item?.secteur).toLowerCase();
+    const itemPublic = clean(item?.typePublic);
+    const itemVille = clean(item?.ville);
+    const itemDept = clean(item?.departement);
+
+    const passType = !typeStructure || itemType === typeStructure;
+    const passSecteur = !secteur || itemSecteur === secteur;
+    const itemPublicCategories = classifyPublicCategories(itemPublic);
     const passPublic =
       !selectedPublicCategory || itemPublicCategories.includes(selectedPublicCategory);
-    const loc = `${item.ville} ${item.departement}`.toLowerCase();
+    const loc = `${itemVille} ${itemDept}`.toLowerCase();
     const passLocation = !location || loc.includes(location);
     const passKeyword = !keyword || group.keywordText.includes(keyword);
 
