@@ -14,7 +14,7 @@
       Tableur
     </button>
 
-    <header class="mx-auto max-w-6xl px-4 pt-10 pb-6 sm:px-6">
+    <header class="mx-auto max-w-6xl px-4 pt-12 pb-4 sm:px-6">
       <div class="mb-4 flex justify-end gap-2">
         <button id="goPersonal" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
           Mon espace
@@ -32,11 +32,11 @@
     </header>
 
     <main class="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
-      <section id="homeView" class="rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
-        <div class="grid gap-4 lg:grid-cols-3">
+      <section id="homeView" class="mx-auto flex min-h-[56vh] max-w-5xl flex-col justify-center rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <div class="grid w-full gap-4 md:grid-cols-3">
           <button
             id="goSearch"
-            class="rounded-2xl border border-cyan-200 bg-cyan-600 px-4 py-6 text-left text-white transition hover:bg-cyan-700"
+            class="rounded-2xl border border-cyan-200 bg-cyan-600 px-4 py-6 text-center text-white transition hover:bg-cyan-700"
           >
             <span class="block text-lg font-bold">Chercher un stage</span>
             <span id="structureCount" class="mt-2 block text-sm text-cyan-100">Chargement des structures...</span>
@@ -44,7 +44,7 @@
 
           <button
             id="goContribute"
-            class="rounded-2xl border border-amber-200 bg-amber-500 px-4 py-6 text-left text-white transition hover:bg-amber-600"
+            class="rounded-2xl border border-amber-200 bg-amber-500 px-4 py-6 text-center text-white transition hover:bg-amber-600"
           >
             <span class="block text-lg font-bold">Partager mon expérience</span>
             <span class="mt-2 block text-sm text-amber-100">Ajouter un retour d'expérience étudiant</span>
@@ -52,14 +52,14 @@
 
           <button
             id="goAddStructure"
-            class="rounded-2xl border border-emerald-200 bg-emerald-600 px-4 py-6 text-left text-white transition hover:bg-emerald-700"
+            class="rounded-2xl border border-emerald-200 bg-emerald-600 px-4 py-6 text-center text-white transition hover:bg-emerald-700"
           >
             <span class="block text-lg font-bold">Renseigner une structure</span>
             <span class="mt-2 block text-sm text-emerald-100">Ajouter une nouvelle structure au site</span>
           </button>
         </div>
 
-        <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600">
           <p>
             Données chargées depuis un CSV publié (Google Sheet) + contributions étudiantes partagées.
           </p>
