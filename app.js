@@ -700,6 +700,7 @@ function bindContributionForm() {
       source: "Contribution étudiante",
     };
 
+    let savedRemotely = false;
     if (state.contributionMode === "edit_structure" && state.editingStructureId) {
       state.structureEdits[state.editingStructureId] = {
         secteur: entry.secteur,
@@ -710,11 +711,14 @@ function bindContributionForm() {
         ville: entry.ville,
         typePublic: entry.typePublic,
       };
-      await persistStructureEdit(state.editingStructureId, state.structureEdits[state.editingStructureId]);
+      savedRemotely = await persistStructureEdit(
+        state.editingStructureId,
+        state.structureEdits[state.editingStructureId]
+      );
       saveStructureEdits(state.structureEdits);
     } else {
       state.localContribs.unshift(entry);
-      await persistContribution(entry);
+      savedRemotely = await persistContribution(entry);
       saveLocalContributions(state.localContribs);
     }
 
@@ -724,16 +728,24 @@ function bindContributionForm() {
     setupContribPublicFilter(el.contribPublic, "");
 
     if (state.contributionMode === "edit_structure") {
-      el.contribStatus.textContent = "Modifications de la structure enregistrées localement.";
+      el.contribStatus.textContent = savedRemotely
+        ? "Modifications enregistrées dans la base en ligne."
+        : "Modifications enregistrées seulement sur cet appareil.";
       el.contribStatus.className = "text-sm text-green-700";
     } else if (state.contributionMode === "add_contact") {
-      el.contribStatus.textContent = "Contact ajouté et enregistré dans le tableur du site.";
+      el.contribStatus.textContent = savedRemotely
+        ? "Contact ajouté et enregistré dans la base en ligne."
+        : "Contact ajouté seulement sur cet appareil.";
       el.contribStatus.className = "text-sm text-green-700";
     } else if (state.contributionMode === "add_experience") {
-      el.contribStatus.textContent = "Expérience ajoutée à cette structure.";
+      el.contribStatus.textContent = savedRemotely
+        ? "Expérience ajoutée et enregistrée dans la base en ligne."
+        : "Expérience ajoutée seulement sur cet appareil.";
       el.contribStatus.className = "text-sm text-green-700";
     } else {
-      el.contribStatus.textContent = "Contribution enregistrée localement.";
+      el.contribStatus.textContent = savedRemotely
+        ? "Contribution enregistrée dans la base en ligne."
+        : "Contribution enregistrée seulement sur cet appareil.";
       el.contribStatus.className = "text-sm text-green-700";
     }
     state.contributionMode = "experience";
@@ -1752,14 +1764,14 @@ async function loadSharedStructureEdits() {
 async function persistContribution(entry) {
   if (supabaseClient) {
     const { error } = await supabaseClient.from("contributions").insert([{ entry }]);
-    if (error) throw error;
-    return;
+    return !error;
   }
 
   try {
     await apiPost(`${API_BASE}/contributions`, { contribution: entry });
+    return true;
   } catch {
-    // Offline/fallback mode: keep local only.
+    return false;
   }
 }
 
@@ -1768,14 +1780,14 @@ async function persistStructureEdit(structureId, edit) {
     const { error } = await supabaseClient
       .from("structure_edits")
       .upsert([{ structure_id: structureId, edit }], { onConflict: "structure_id" });
-    if (error) throw error;
-    return;
+    return !error;
   }
 
   try {
     await apiPost(`${API_BASE}/structure-edits`, { structureId, edit });
+    return true;
   } catch {
-    // Offline/fallback mode: keep local only.
+    return false;
   }
 }
 
