@@ -6,6 +6,7 @@ const STORAGE_KEY = "chop_ton_stage_contributions_v1";
 const STRUCTURE_EDITS_KEY = "chop_ton_stage_structure_edits_v1";
 const ACCOUNT_PROFILE_KEY = "chop_ton_stage_account_profile_v1";
 const TRACKING_BY_USER_KEY = "chop_ton_stage_tracking_by_user_v1";
+const SUPABASE_MIGRATION_DONE_KEY = "chop_ton_stage_supabase_migration_done_v1";
 const API_BASE = "/api";
 const APP_CONFIG = window.CHOP_CONFIG || {};
 const SUPABASE_URL = typeof APP_CONFIG.supabaseUrl === "string" ? APP_CONFIG.supabaseUrl.trim() : "";
@@ -713,7 +714,12 @@ async function loadRemoteCsv() {
 }
 
 async function syncSharedState() {
-  const [sharedContribs, sharedEdits] = await Promise.all([
+  let [sharedContribs, sharedEdits] = await Promise.all([
+    loadSharedContributions(),
+    loadSharedStructureEdits(),
+  ]);
+  await migrateLocalToSupabaseIfNeeded(sharedContribs, sharedEdits);
+  [sharedContribs, sharedEdits] = await Promise.all([
     loadSharedContributions(),
     loadSharedStructureEdits(),
   ]);
@@ -736,6 +742,51 @@ async function syncSharedState() {
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
   if (!el.detailView.classList.contains("hidden") && state.activeStructureId) {
     openStructureDetail(state.activeStructureId);
+  }
+}
+
+async function migrateLocalToSupabaseIfNeeded(sharedContribs, sharedEdits) {
+  if (!supabaseClient) return;
+  if (localStorage.getItem(SUPABASE_MIGRATION_DONE_KEY) === "1") return;
+
+  const localContribs = Array.isArray(state.localContribs) ? state.localContribs : [];
+  const localEdits = state.structureEdits && typeof state.structureEdits === "object" ? state.structureEdits : {};
+  const sharedContribCount = Array.isArray(sharedContribs) ? sharedContribs.length : 0;
+  const sharedEditCount = sharedEdits && typeof sharedEdits === "object" ? Object.keys(sharedEdits).length : 0;
+
+  const shouldMigrateContribs = sharedContribCount === 0 && localContribs.length > 0;
+  const shouldMigrateEdits = sharedEditCount === 0 && Object.keys(localEdits).length > 0;
+  if (!shouldMigrateContribs && !shouldMigrateEdits) {
+    localStorage.setItem(SUPABASE_MIGRATION_DONE_KEY, "1");
+    return;
+  }
+
+  try {
+    if (shouldMigrateContribs) {
+      const rows = localContribs
+        .filter((entry) => entry && typeof entry === "object")
+        .map((entry) => ({ entry }));
+      if (rows.length) {
+        const { error } = await supabaseClient.from("contributions").insert(rows);
+        if (error) throw error;
+      }
+    }
+
+    if (shouldMigrateEdits) {
+      const rows = Object.entries(localEdits)
+        .filter(([structureId, edit]) => clean(structureId) && edit && typeof edit === "object")
+        .map(([structureId, edit]) => ({ structure_id: structureId, edit }));
+      if (rows.length) {
+        const { error } = await supabaseClient
+          .from("structure_edits")
+          .upsert(rows, { onConflict: "structure_id" });
+        if (error) throw error;
+      }
+    }
+
+    localStorage.setItem(SUPABASE_MIGRATION_DONE_KEY, "1");
+  } catch (error) {
+    console.error("Migration locale vers Supabase échouée:", error);
   }
 }
 
