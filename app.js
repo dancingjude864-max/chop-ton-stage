@@ -7,6 +7,13 @@ const STRUCTURE_EDITS_KEY = "chop_ton_stage_structure_edits_v1";
 const ACCOUNT_PROFILE_KEY = "chop_ton_stage_account_profile_v1";
 const TRACKING_BY_USER_KEY = "chop_ton_stage_tracking_by_user_v1";
 const API_BASE = "/api";
+const APP_CONFIG = window.CHOP_CONFIG || {};
+const SUPABASE_URL = typeof APP_CONFIG.supabaseUrl === "string" ? APP_CONFIG.supabaseUrl.trim() : "";
+const SUPABASE_ANON_KEY = typeof APP_CONFIG.supabaseAnonKey === "string" ? APP_CONFIG.supabaseAnonKey.trim() : "";
+const supabaseClient =
+  window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
 const SECTEUR_PUBLICS = {
   "Petite enfance": ["Enfants 0-3 ans", "Enfants 0-6 ans", "Familles"],
@@ -1449,6 +1456,16 @@ function saveTrackingByUser(trackingByUser) {
 }
 
 async function loadSharedContributions() {
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient
+      .from("contributions")
+      .select("entry")
+      .order("created_at", { ascending: false })
+      .limit(20000);
+    if (error) throw error;
+    return (data || []).map((row) => row?.entry).filter((entry) => entry && typeof entry === "object");
+  }
+
   try {
     const payload = await apiGet(`${API_BASE}/contributions`);
     return Array.isArray(payload?.contributions) ? payload.contributions : null;
@@ -1458,6 +1475,22 @@ async function loadSharedContributions() {
 }
 
 async function loadSharedStructureEdits() {
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient
+      .from("structure_edits")
+      .select("structure_id,edit");
+    if (error) throw error;
+    const edits = {};
+    (data || []).forEach((row) => {
+      if (!row || typeof row !== "object") return;
+      const structureId = clean(row.structure_id);
+      if (!structureId) return;
+      if (!row.edit || typeof row.edit !== "object") return;
+      edits[structureId] = row.edit;
+    });
+    return edits;
+  }
+
   try {
     const payload = await apiGet(`${API_BASE}/structure-edits`);
     return payload?.structureEdits && typeof payload.structureEdits === "object"
@@ -1469,6 +1502,12 @@ async function loadSharedStructureEdits() {
 }
 
 async function persistContribution(entry) {
+  if (supabaseClient) {
+    const { error } = await supabaseClient.from("contributions").insert([{ entry }]);
+    if (error) throw error;
+    return;
+  }
+
   try {
     await apiPost(`${API_BASE}/contributions`, { contribution: entry });
   } catch {
@@ -1477,6 +1516,14 @@ async function persistContribution(entry) {
 }
 
 async function persistStructureEdit(structureId, edit) {
+  if (supabaseClient) {
+    const { error } = await supabaseClient
+      .from("structure_edits")
+      .upsert([{ structure_id: structureId, edit }], { onConflict: "structure_id" });
+    if (error) throw error;
+    return;
+  }
+
   try {
     await apiPost(`${API_BASE}/structure-edits`, { structureId, edit });
   } catch {

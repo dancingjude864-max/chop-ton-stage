@@ -11,7 +11,7 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Tableur local</h1>
-          <p class="mt-1 text-sm text-slate-600">Vue tableur du CSV + contributions étudiantes locales.</p>
+          <p class="mt-1 text-sm text-slate-600">Vue tableur du CSV + contributions étudiantes partagées.</p>
         </div>
         <a href="./index.html" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">Retour plateforme</a>
       </div>
@@ -39,10 +39,12 @@
       </section>
 
       <p class="mt-4 text-xs text-slate-500">
-        Note: ce tableur local se met à jour avec les contributions du navigateur actuel (localStorage).
+        Note: ce tableur se met à jour depuis Supabase si configuré, sinon fallback local.
       </p>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
     <script src="./tableur-local.js"></script>
   </body>
 </html>
