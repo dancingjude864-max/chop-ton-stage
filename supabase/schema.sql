@@ -94,6 +94,12 @@ for insert
 to anon
 with check (jsonb_typeof(entry) = 'object');
 
+create policy if not exists "contributions_delete_public"
+on public.contributions
+for delete
+to anon
+using (true);
+
 create policy if not exists "structure_edits_insert_public"
 on public.structure_edits
 for insert

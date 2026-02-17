@@ -257,6 +257,8 @@ function bindNavigation() {
     el.filterKeyword.value = "";
     renderResults();
   });
+
+  el.detailContacts.addEventListener("click", onDetailContactsClick);
 }
 
 function showView(view) {
@@ -1457,6 +1459,8 @@ function extractContacts(records, edit) {
       poste: clean(record.poste),
       email: clean(record.email),
       telephone: clean(record.telephone),
+      isContribution: clean(record.source) === "Contribution étudiante",
+      contributionId: clean(record._contributionId),
     };
     if (!contact.genre && !contact.poste && !contact.email && !contact.telephone) return;
     const key = normalizeForSearch([contact.genre, contact.poste, contact.email, contact.telephone].join("|"));
@@ -1493,10 +1497,35 @@ function renderContactsForStructure(group) {
         <p class="text-sm text-slate-900"><span class="font-semibold">Fonction:</span> ${escapeHtml(contact.poste || "-")}</p>
         <p class="mt-2 text-sm text-slate-900"><span class="font-semibold">Email:</span> ${contact.email ? `<a class="text-cyan-700 hover:underline" href="mailto:${escapeHtml(contact.email)}">${escapeHtml(contact.email)}</a>` : "-"}</p>
         <p class="text-sm text-slate-900"><span class="font-semibold">Téléphone:</span> ${contact.telephone ? `<a class="text-cyan-700 hover:underline" href="tel:${escapeHtml(contact.telephone)}">${escapeHtml(contact.telephone)}</a>` : "-"}</p>
+        ${
+          contact.isContribution && contact.contributionId
+            ? `<button data-delete-contact-id="${escapeHtml(contact.contributionId)}" class="mt-3 rounded-lg border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50">Supprimer ce contact</button>`
+            : ""
+        }
       </article>
     `
     )
     .join("");
+}
+
+async function onDetailContactsClick(event) {
+  const btn = event.target.closest("[data-delete-contact-id]");
+  if (!btn) return;
+  const contributionId = clean(btn.getAttribute("data-delete-contact-id"));
+  if (!contributionId) return;
+  const confirmed = window.confirm("Supprimer ce contact ajouté par contribution ?");
+  if (!confirmed) return;
+
+  const ok = await deleteContributionById(contributionId);
+  if (!ok) {
+    window.alert("Impossible de supprimer ce contact pour le moment.");
+    return;
+  }
+
+  state.localContribs = state.localContribs.filter((entry) => clean(entry._contributionId) !== contributionId);
+  saveLocalContributions(state.localContribs);
+  updateCount();
+  if (state.activeStructureId) openStructureDetail(state.activeStructureId);
 }
 
 function prefillContributionForm(record) {
@@ -1719,11 +1748,17 @@ async function loadSharedContributions() {
   if (supabaseClient) {
     const { data, error } = await supabaseClient
       .from("contributions")
-      .select("entry")
+      .select("id,entry")
       .order("created_at", { ascending: false })
       .limit(20000);
     if (error) throw error;
-    return (data || []).map((row) => row?.entry).filter((entry) => entry && typeof entry === "object");
+    return (data || [])
+      .map((row) => {
+        const entry = row?.entry;
+        if (!entry || typeof entry !== "object") return null;
+        return { ...entry, _contributionId: clean(row.id) };
+      })
+      .filter(Boolean);
   }
 
   try {
@@ -1773,6 +1808,13 @@ async function persistContribution(entry) {
   } catch {
     return false;
   }
+}
+
+async function deleteContributionById(contributionId) {
+  if (!contributionId) return false;
+  if (!supabaseClient) return false;
+  const { error } = await supabaseClient.from("contributions").delete().eq("id", contributionId);
+  return !error;
 }
 
 async function persistStructureEdit(structureId, edit) {
