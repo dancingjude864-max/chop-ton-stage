@@ -781,6 +781,11 @@ function bindContributionForm() {
       openStructureDetail(submitStructureId);
       el.contribStatus.textContent = "";
       showView("detail");
+    } else if (submitMode === "new_structure") {
+      const newStructureId = makeStructureId(entry);
+      openStructureDetail(newStructureId);
+      el.contribStatus.textContent = "";
+      showView("detail");
     }
   });
 }
