@@ -835,19 +835,20 @@ async function syncSharedState() {
     loadSharedStructureEdits(),
   ]);
   await migrateLocalToSupabaseIfNeeded(sharedContribs, sharedEdits);
+  await backfillLocalDataToSupabase(sharedContribs, sharedEdits);
   [sharedContribs, sharedEdits] = await Promise.all([
     loadSharedContributions(),
     loadSharedStructureEdits(),
   ]);
 
   let changed = false;
-  if (sharedContribs) {
-    state.localContribs = sharedContribs;
+  if (sharedContribs || state.localContribs.length) {
+    state.localContribs = mergeUniqueContributions(sharedContribs || [], state.localContribs || []);
     saveLocalContributions(state.localContribs);
     changed = true;
   }
-  if (sharedEdits) {
-    state.structureEdits = sharedEdits;
+  if (sharedEdits || Object.keys(state.structureEdits || {}).length) {
+    state.structureEdits = mergeStructureEdits(sharedEdits || {}, state.structureEdits || {});
     saveStructureEdits(state.structureEdits);
     changed = true;
   }
@@ -904,6 +905,86 @@ async function migrateLocalToSupabaseIfNeeded(sharedContribs, sharedEdits) {
   } catch (error) {
     console.error("Migration locale vers Supabase échouée:", error);
   }
+}
+
+async function backfillLocalDataToSupabase(sharedContribs, sharedEdits) {
+  if (!supabaseClient) return;
+
+  const localContribs = Array.isArray(state.localContribs) ? state.localContribs : [];
+  const remoteContribs = Array.isArray(sharedContribs) ? sharedContribs : [];
+  const remoteKeys = new Set(remoteContribs.map(contributionFingerprint));
+  const contribsToPush = localContribs.filter((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const key = contributionFingerprint(entry);
+    return key && !remoteKeys.has(key);
+  });
+
+  if (contribsToPush.length) {
+    const rows = contribsToPush.map((entry) => ({ entry }));
+    const { error } = await supabaseClient.from("contributions").insert(rows);
+    if (error) {
+      console.error("Backfill contributions failed:", error);
+    }
+  }
+
+  const localEdits = state.structureEdits && typeof state.structureEdits === "object" ? state.structureEdits : {};
+  const remoteEditMap = sharedEdits && typeof sharedEdits === "object" ? sharedEdits : {};
+  const editsToPush = Object.entries(localEdits)
+    .filter(([structureId, edit]) => {
+      if (!clean(structureId) || !edit || typeof edit !== "object") return false;
+      return !remoteEditMap[structureId];
+    })
+    .map(([structureId, edit]) => ({ structure_id: structureId, edit }));
+
+  if (editsToPush.length) {
+    const { error } = await supabaseClient
+      .from("structure_edits")
+      .upsert(editsToPush, { onConflict: "structure_id" });
+    if (error) {
+      console.error("Backfill structure edits failed:", error);
+    }
+  }
+}
+
+function mergeUniqueContributions(remoteEntries, localEntries) {
+  const merged = [];
+  const seen = new Set();
+  [...(remoteEntries || []), ...(localEntries || [])].forEach((entry) => {
+    if (!entry || typeof entry !== "object") return;
+    const key = contributionFingerprint(entry);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push(entry);
+  });
+  return merged;
+}
+
+function contributionFingerprint(entry) {
+  if (!entry || typeof entry !== "object") return "";
+  return normalizeForSearch([
+    clean(entry.structureId),
+    clean(entry.secteur),
+    clean(entry.typeStructure),
+    clean(entry.association),
+    clean(entry.departement),
+    clean(entry.nomStructure),
+    clean(entry.email),
+    clean(entry.telephone),
+    clean(entry.poste),
+    clean(entry.genre),
+    clean(entry.gratification),
+    clean(entry.ville),
+    clean(entry.typePublic),
+    clean(entry.duree),
+    clean(entry.diplome),
+    clean(entry.ambiance),
+    clean(entry.conseils),
+    clean(entry.source),
+  ].join("|"));
+}
+
+function mergeStructureEdits(remoteEdits, localEdits) {
+  return { ...(remoteEdits || {}), ...(localEdits || {}) };
 }
 
 function toRecord(cols) {
