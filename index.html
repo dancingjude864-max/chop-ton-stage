@@ -311,13 +311,19 @@
             <div class="rounded-xl border border-indigo-300/35 bg-slate-950/45 p-3">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="text-sm font-semibold text-indigo-200">Assistant web (beta)</p>
-                <button id="runStructureAssistant" type="button" class="rounded-lg border border-indigo-300/45 px-3 py-1 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10">
-                  Compléter automatiquement
-                </button>
+                <div class="flex flex-wrap gap-2">
+                  <button id="runStructureAssistant" type="button" class="rounded-lg border border-indigo-300/45 px-3 py-1 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10">
+                    Analyser
+                  </button>
+                  <button id="applyAllAssistantSuggestions" type="button" class="rounded-lg border border-emerald-300/45 px-3 py-1 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/10">
+                    Tout appliquer
+                  </button>
+                </div>
               </div>
               <p id="structureAssistantStatus" class="mt-2 text-xs text-slate-300">
-                Le robot propose des compléments depuis des sources publiques. Vérifiez toujours avant d'enregistrer.
+                Le robot propose des compléments avec score de confiance. Vérifiez avant d'enregistrer.
               </p>
+              <div id="structureAssistantSuggestions" class="mt-3 grid gap-2"></div>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <label class="text-sm font-medium">Nom de la structure *

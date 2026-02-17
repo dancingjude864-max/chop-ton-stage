@@ -83,6 +83,7 @@ const state = {
   routeApplied: false,
   contributionMode: "experience",
   editingStructureId: null,
+  assistantSuggestions: {},
 };
 
 const el = {
@@ -157,7 +158,9 @@ const el = {
   otherTypeInput: document.getElementById("otherTypeInput"),
   dureeHint: document.getElementById("dureeHint"),
   runStructureAssistant: document.getElementById("runStructureAssistant"),
+  applyAllAssistantSuggestions: document.getElementById("applyAllAssistantSuggestions"),
   structureAssistantStatus: document.getElementById("structureAssistantStatus"),
+  structureAssistantSuggestions: document.getElementById("structureAssistantSuggestions"),
 };
 
 init();
@@ -864,6 +867,14 @@ function bindContributionForm() {
 function bindStructureAssistant() {
   if (!el.runStructureAssistant) return;
   el.runStructureAssistant.addEventListener("click", runStructureAssistant);
+  el.applyAllAssistantSuggestions?.addEventListener("click", () => applyAssistantSuggestions(true));
+  el.structureAssistantSuggestions?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-assistant-apply]");
+    if (!btn) return;
+    const field = clean(btn.getAttribute("data-assistant-apply"));
+    if (!field) return;
+    applyAssistantSuggestions(false, field);
+  });
 }
 
 async function runStructureAssistant() {
@@ -879,77 +890,126 @@ async function runStructureAssistant() {
   }
 
   if (el.structureAssistantStatus) {
-    el.structureAssistantStatus.textContent = "Recherche en cours...";
+    el.structureAssistantStatus.textContent = "Analyse en cours...";
     el.structureAssistantStatus.className = "mt-2 text-xs text-indigo-200";
   }
 
-  const query = [nomStructure, ville, departement].filter(Boolean).join(" ");
-  const [wikiRes, ddgRes, addrRes] = await Promise.allSettled([
-    fetchJson(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json&origin=*`),
-    fetchJson(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&no_redirect=1&skip_disambig=1`),
-    fetchJson(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=1`),
-  ]);
+  const payload = {
+    nomStructure,
+    ville,
+    departement,
+    association: clean(el.contribForm.elements.association?.value),
+    typeStructure: clean(el.contribForm.elements.typeStructure?.value),
+    secteur: clean(el.contribForm.elements.secteur?.value),
+  };
 
-  const wikiText = wikiRes.status === "fulfilled"
-    ? (wikiRes.value?.query?.search || []).slice(0, 2).map((item) => `${item?.title || ""} ${item?.snippet || ""}`).join(" ")
-    : "";
-  const ddgText = ddgRes.status === "fulfilled"
-    ? `${ddgRes.value?.Heading || ""} ${ddgRes.value?.AbstractText || ""}`
-    : "";
-  const combined = normalizeForSearch(`${wikiText} ${ddgText}`);
-
-  const suggestions = {};
-
-  if (!clean(el.contribForm.elements.typeStructure?.value)) {
-    const foundType = TYPE_STRUCTURES.find((type) => combined.includes(normalizeForSearch(type)));
-    if (foundType) suggestions.typeStructure = foundType;
+  let suggestions = {};
+  try {
+    const response = await fetch("/api/assistant-suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error(`assistant http ${response.status}`);
+    const result = await response.json();
+    suggestions = result?.suggestions && typeof result.suggestions === "object" ? result.suggestions : {};
+  } catch (error) {
+    console.error(error);
+    suggestions = fallbackAssistantSuggestions(payload);
   }
 
-  if (!clean(el.contribForm.elements.secteur?.value)) {
-    const foundSecteur = Object.entries(ASSISTANT_SECTEUR_KEYWORDS).find(([, keywords]) =>
-      keywords.some((keyword) => combined.includes(normalizeForSearch(keyword)))
-    )?.[0];
-    if (foundSecteur) suggestions.secteur = foundSecteur;
-  }
-
-  if (addrRes.status === "fulfilled" && addrRes.value?.features?.length) {
-    const props = addrRes.value.features[0].properties || {};
-    if (!clean(el.contribForm.elements.ville?.value) && props.city) suggestions.ville = clean(props.city);
-    if (!clean(el.contribForm.elements.departement?.value) && props.postcode) suggestions.departement = clean(props.postcode).slice(0, 2);
-  }
-
-  if (suggestions.typeStructure) {
-    el.contribForm.elements.typeStructure.value = suggestions.typeStructure;
-    el.otherTypeWrap.classList.toggle("hidden", suggestions.typeStructure !== "Autre");
-    el.otherTypeInput.required = suggestions.typeStructure === "Autre";
-  }
-  if (suggestions.secteur) {
-    el.contribForm.elements.secteur.value = suggestions.secteur;
-    setupContribPublicFilter(el.contribPublic, suggestions.secteur);
-    if (!clean(el.contribForm.elements.typePublic?.value)) {
-      const publics = SECTEUR_PUBLICS[suggestions.secteur] || [];
-      if (publics.length === 1) el.contribForm.elements.typePublic.value = publics[0];
-    }
-  }
-  if (suggestions.ville) el.contribForm.elements.ville.value = suggestions.ville;
-  if (suggestions.departement) el.contribForm.elements.departement.value = suggestions.departement;
-
+  state.assistantSuggestions = suggestions;
+  renderAssistantSuggestions();
   const changedFields = Object.keys(suggestions);
   if (el.structureAssistantStatus) {
     if (!changedFields.length) {
-      el.structureAssistantStatus.textContent = "Aucune suggestion fiable trouvée. Vérifiez manuellement.";
+      el.structureAssistantStatus.textContent = "Aucune suggestion fiable trouvée.";
       el.structureAssistantStatus.className = "mt-2 text-xs text-slate-300";
     } else {
-      el.structureAssistantStatus.textContent = `Suggestions appliquées: ${changedFields.join(", ")}. Vérifiez avant d'enregistrer.`;
+      el.structureAssistantStatus.textContent = `Suggestions trouvées: ${changedFields.join(", ")}. Cliquez sur Appliquer ou Tout appliquer.`;
       el.structureAssistantStatus.className = "mt-2 text-xs text-emerald-300";
     }
   }
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+function renderAssistantSuggestions() {
+  if (!el.structureAssistantSuggestions) return;
+  const suggestions = state.assistantSuggestions || {};
+  const fields = Object.keys(suggestions);
+  if (!fields.length) {
+    el.structureAssistantSuggestions.innerHTML = "";
+    return;
+  }
+  const labels = {
+    typeStructure: "Type de structure",
+    secteur: "Secteur",
+    ville: "Ville",
+    departement: "Département",
+  };
+  el.structureAssistantSuggestions.innerHTML = fields
+    .map((field) => {
+      const sug = suggestions[field] || {};
+      const value = clean(sug.value);
+      const confidence = Number(sug.confidence || 0);
+      const reason = clean(sug.reason);
+      return `
+      <div class="rounded-lg border border-indigo-400/35 bg-slate-900/70 p-2 text-xs">
+        <p><span class="font-semibold text-indigo-200">${escapeHtml(labels[field] || field)}:</span> <span class="text-slate-100">${escapeHtml(value || "-")}</span></p>
+        <p class="text-slate-300">Confiance: ${Math.round(confidence * 100)}%</p>
+        ${reason ? `<p class="text-slate-400">${escapeHtml(reason)}</p>` : ""}
+        <button data-assistant-apply="${escapeHtml(field)}" type="button" class="mt-2 rounded border border-indigo-300/40 px-2 py-1 text-indigo-200 hover:bg-indigo-500/10">Appliquer</button>
+      </div>`;
+    })
+    .join("");
+}
+
+function applyAssistantSuggestions(applyAll = false, fieldName = "") {
+  const suggestions = state.assistantSuggestions || {};
+  const fields = applyAll ? Object.keys(suggestions) : [fieldName];
+  fields.forEach((field) => {
+    const suggestion = suggestions[field];
+    if (!suggestion) return;
+    const value = clean(suggestion.value);
+    if (!value) return;
+    if (field === "typeStructure") {
+      el.contribForm.elements.typeStructure.value = value;
+      el.otherTypeWrap.classList.toggle("hidden", value !== "Autre");
+      el.otherTypeInput.required = value === "Autre";
+      return;
+    }
+    if (field === "secteur") {
+      el.contribForm.elements.secteur.value = value;
+      setupContribPublicFilter(el.contribPublic, value);
+      return;
+    }
+    if (field === "ville") {
+      el.contribForm.elements.ville.value = value;
+      return;
+    }
+    if (field === "departement") {
+      el.contribForm.elements.departement.value = value;
+    }
+  });
+  if (el.structureAssistantStatus) {
+    el.structureAssistantStatus.textContent = applyAll
+      ? "Toutes les suggestions ont été appliquées."
+      : "Suggestion appliquée.";
+    el.structureAssistantStatus.className = "mt-2 text-xs text-emerald-300";
+  }
+}
+
+function fallbackAssistantSuggestions(payload) {
+  const combined = normalizeForSearch(
+    [payload.nomStructure, payload.association, payload.ville, payload.departement].join(" ")
+  );
+  const out = {};
+  const foundType = TYPE_STRUCTURES.find((type) => combined.includes(normalizeForSearch(type)));
+  if (foundType) out.typeStructure = { value: foundType, confidence: 0.55, reason: "Correspondance textuelle locale." };
+  const foundSecteur = Object.entries(ASSISTANT_SECTEUR_KEYWORDS).find(([, keywords]) =>
+    keywords.some((keyword) => combined.includes(normalizeForSearch(keyword)))
+  )?.[0];
+  if (foundSecteur) out.secteur = { value: foundSecteur, confidence: 0.55, reason: "Mot-clé du secteur détecté." };
+  return out;
 }
 
 function validateContributionForm({ mode, data, postes, baseRecord }) {
