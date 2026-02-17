@@ -764,7 +764,10 @@ function bindContributionForm() {
       poste: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : postes.join(", "),
       genre: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("genre")),
       gratification: isAddContactMode ? clean(baseRecord?.gratification) : clean(data.get("gratification")),
-      ville: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.ville) : clean(data.get("ville")),
+      ville: normalizeVilleByDepartement(
+        (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.ville) : clean(data.get("ville")),
+        (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement"))
+      ),
       typePublic: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typePublic) : clean(data.get("typePublic")),
       duree: isAddContactMode ? clean(baseRecord?.duree) : clean(data.get("duree")),
       diplome: isAddContactMode ? clean(baseRecord?.diplome) : clean(data.get("diplome")),
@@ -1085,18 +1088,21 @@ function mergeStructureEdits(remoteEdits, localEdits) {
 }
 
 function toRecord(cols) {
+  const departement = clean(cols[3]);
+  const rawVille = clean(cols[10]);
+  const ville = normalizeVilleByDepartement(rawVille, departement);
   return {
     secteur: clean(cols[0]),
     typeStructure: clean(cols[1]),
     association: clean(cols[2]),
-    departement: clean(cols[3]),
+    departement,
     nomStructure: clean(cols[4]),
     email: clean(cols[5]),
     telephone: clean(cols[6]),
     poste: clean(cols[7]),
     genre: normalizeGenre(cols[8]),
     gratification: normalizeOuiNon(cols[9]),
-    ville: clean(cols[10]),
+    ville,
     typePublic: clean(cols[11]),
     duree: clean(cols[12]),
     diplome: clean(cols[13]),
@@ -1336,6 +1342,12 @@ function normalizeOuiNon(value) {
 
 function clean(value) {
   return (value || "").toString().trim();
+}
+
+function normalizeVilleByDepartement(ville, departement) {
+  const dep = clean(departement);
+  if (dep === "75") return "Paris";
+  return clean(ville);
 }
 
 function searchableRecordText(item) {
