@@ -922,8 +922,8 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
 async function loadRemoteCsv() {
   try {
     const supabaseStructures = await loadStructuresFromSupabase();
-    if (supabaseClient) {
-      state.remoteData = supabaseStructures || [];
+    if (supabaseStructures && supabaseStructures.length) {
+      state.remoteData = supabaseStructures;
       updateCount();
       applyInitialRoute();
       if (!el.searchView.classList.contains("hidden")) renderResults();

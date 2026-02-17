@@ -59,9 +59,7 @@ function bindEvents() {
 async function loadRows() {
   try {
     let remoteRows = await loadStructuresRowsFromSupabase();
-    if (supabaseClient) {
-      remoteRows = remoteRows || [];
-    } else if (!remoteRows || !remoteRows.length) {
+    if (!remoteRows || !remoteRows.length) {
       const response = await fetch(CSV_URL);
       if (!response.ok) throw new Error(`CSV HTTP ${response.status}`);
       const raw = await response.text();
