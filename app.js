@@ -83,6 +83,7 @@ const el = {
   structureCount: document.getElementById("structureCount"),
   goSearch: document.getElementById("goSearch"),
   goContribute: document.getElementById("goContribute"),
+  goAddStructure: document.getElementById("goAddStructure"),
   goSpreadsheet: document.getElementById("goSpreadsheet"),
   goPersonal: document.getElementById("goPersonal"),
   goAccount: document.getElementById("goAccount"),
@@ -166,6 +167,20 @@ function bindNavigation() {
     state.editingStructureId = null;
     setContribReturnTarget(null);
     showView("contrib");
+  });
+  el.goAddStructure.addEventListener("click", () => {
+    clearStructureParamInUrl();
+    state.editingStructureId = null;
+    setContribReturnTarget(null);
+    state.contributionMode = "new_structure";
+    setContributionMode("new_structure");
+    el.contribForm.reset();
+    el.otherTypeWrap.classList.add("hidden");
+    el.otherTypeInput.required = false;
+    setupContribPublicFilter(el.contribPublic, "");
+    showView("contrib");
+    el.contribStatus.textContent = "Renseignez les informations de la structure puis enregistrez.";
+    el.contribStatus.className = "text-sm text-emerald-700";
   });
   el.goSpreadsheet.addEventListener("click", () => {
     const params = new URLSearchParams(window.location.search);
@@ -645,6 +660,7 @@ function bindContributionForm() {
     event.preventDefault();
 
     const isEditMode = state.contributionMode === "edit_structure";
+    const isNewStructureMode = state.contributionMode === "new_structure";
     const isAddExperienceMode = state.contributionMode === "add_experience";
     const isAddContactMode = state.contributionMode === "add_contact";
     const submitMode = state.contributionMode;
@@ -687,10 +703,10 @@ function bindContributionForm() {
       association: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.association) : clean(data.get("association")),
       departement: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement")),
       nomStructure: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.nomStructure) : clean(data.get("nomStructure")),
-      email: (isEditMode || isAddExperienceMode) ? "" : clean(data.get("email")),
-      telephone: (isEditMode || isAddExperienceMode) ? "" : clean(data.get("telephone")),
-      poste: (isEditMode || isAddExperienceMode) ? "" : postes.join(", "),
-      genre: (isEditMode || isAddExperienceMode) ? "" : clean(data.get("genre")),
+      email: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("email")),
+      telephone: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("telephone")),
+      poste: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : postes.join(", "),
+      genre: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("genre")),
       gratification: isAddContactMode ? clean(baseRecord?.gratification) : clean(data.get("gratification")),
       ville: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.ville) : clean(data.get("ville")),
       typePublic: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typePublic) : clean(data.get("typePublic")),
@@ -734,6 +750,11 @@ function bindContributionForm() {
         ? "Modifications enregistrées dans la base en ligne."
         : "Modifications enregistrées seulement sur cet appareil.";
       el.contribStatus.className = "text-sm text-green-700";
+    } else if (state.contributionMode === "new_structure") {
+      el.contribStatus.textContent = savedRemotely
+        ? "Structure ajoutée dans la base en ligne."
+        : "Structure ajoutée seulement sur cet appareil.";
+      el.contribStatus.className = "text-sm text-green-700";
     } else if (state.contributionMode === "add_contact") {
       el.contribStatus.textContent = savedRemotely
         ? "Contact ajouté et enregistré dans la base en ligne."
@@ -767,6 +788,7 @@ function bindContributionForm() {
 function validateContributionForm({ mode, data, postes, baseRecord }) {
   const isExperience = mode === "experience";
   const isEdit = mode === "edit_structure";
+  const isNewStructure = mode === "new_structure";
   const isAddContact = mode === "add_contact";
   const isAddExperience = mode === "add_experience";
 
@@ -775,7 +797,7 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
   const hasTypeStructure =
     get("typeStructure") && (get("typeStructure") !== "Autre" || clean(data.get("typeStructureAutre")));
 
-  if (isExperience || isEdit) {
+  if (isExperience || isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
     if (!get("ville")) return "La ville est requise.";
     if (!isTwoDigitDept(get("departement"))) return "Le département doit contenir 2 chiffres.";
@@ -1567,20 +1589,24 @@ function prefillContributionForm(record) {
 
 function setContributionMode(mode) {
   if (mode === "edit_structure") state.contributionMode = "edit_structure";
+  else if (mode === "new_structure") state.contributionMode = "new_structure";
   else if (mode === "add_contact") state.contributionMode = "add_contact";
   else if (mode === "add_experience") state.contributionMode = "add_experience";
   else state.contributionMode = "experience";
 
   const isEdit = state.contributionMode === "edit_structure";
+  const isNewStructure = state.contributionMode === "new_structure";
   const isAddContact = state.contributionMode === "add_contact";
   const isAddExperience = state.contributionMode === "add_experience";
   const isExperience = state.contributionMode === "experience" || isAddExperience;
 
   el.contribStructureDetails.classList.toggle("hidden", isAddContact || isAddExperience);
-  el.contribContactDetails.classList.toggle("hidden", isEdit || isAddExperience);
+  el.contribContactDetails.classList.toggle("hidden", isEdit || isNewStructure || isAddExperience);
   el.contribStageDetails.classList.toggle("hidden", !isExperience);
   el.contribSubmitBtn.textContent = isEdit
     ? "Enregistrer les modifications"
+    : isNewStructure
+      ? "Enregistrer la structure"
     : isAddContact
       ? "Enregistrer le contact"
       : isAddExperience
