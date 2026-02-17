@@ -1114,7 +1114,7 @@ function renderResults() {
   el.resultMeta.textContent = `${filtered.length} structure(s) (${filteredEntries} entrée(s) contacts) sur ${structureGroups.length} structure(s) (${totalEntries} entrée(s) contacts).`;
 
   if (filtered.length === 0) {
-    el.results.innerHTML = '<div class="rounded-xl border border-indigo-400/30 bg-slate-900/70 p-4 text-sm text-slate-300">Aucun résultat pour ces filtres.</div>';
+    el.results.innerHTML = '<div class="rounded-xl border border-indigo-300/45 bg-slate-950/70 p-4 text-sm text-slate-200">Aucun résultat pour ces filtres.</div>';
     if (!el.personalView.classList.contains("hidden")) renderPersonalView();
     return;
   }
@@ -1137,7 +1137,7 @@ function renderCard(item) {
   return `
     <article
       data-structure-id="${escapeHtml(item.id)}"
-      class="structure-card rounded-2xl border border-indigo-400/30 bg-slate-900/70 p-4 shadow-sm transition hover:border-violet-400/60 hover:shadow-md cursor-pointer"
+      class="structure-card rounded-2xl border border-indigo-300/55 bg-slate-950/80 p-4 shadow-lg shadow-indigo-950/40 transition hover:border-fuchsia-300/70 hover:shadow-indigo-900/50 cursor-pointer"
     >
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
