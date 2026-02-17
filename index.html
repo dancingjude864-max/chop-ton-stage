@@ -178,7 +178,7 @@
           </button>
         </div>
         <h2 class="text-xl font-bold text-slate-900">Compte (optionnel)</h2>
-        <p class="mt-1 text-sm text-slate-600">Créez un compte local avec pseudo + PIN pour suivre vos candidatures.</p>
+        <p class="mt-1 text-sm text-slate-600">Créez un compte ou connectez-vous avec pseudo + PIN pour suivre vos candidatures.</p>
         <p id="accountStatus" class="mt-3 text-sm text-slate-700"></p>
 
         <div id="accountCreateBlock" class="mt-4 rounded-xl border border-slate-200 p-4">
@@ -198,6 +198,9 @@
 
         <div id="accountLoginBlock" class="mt-4 rounded-xl border border-slate-200 p-4">
           <h3 class="text-sm font-semibold text-slate-900">Connexion</h3>
+          <label class="mt-3 block text-sm">Pseudo
+            <input id="accountPseudoLogin" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 sm:w-64" />
+          </label>
           <label class="mt-3 block text-sm">Code PIN
             <input id="accountPinLogin" type="password" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 sm:w-64" />
           </label>

@@ -38,12 +38,28 @@ create table if not exists public.structure_edits (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.user_accounts (
+  pseudo text primary key,
+  pin text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.user_tracking (
+  pseudo text not null,
+  structure_id text not null,
+  status text not null check (status in ('interesse', 'candidate')),
+  updated_at timestamptz not null default now(),
+  primary key (pseudo, structure_id)
+);
+
 create index if not exists contributions_created_at_idx on public.contributions (created_at desc);
 create index if not exists structures_structure_id_idx on public.structures (structure_id);
 
 alter table public.structures enable row level security;
 alter table public.contributions enable row level security;
 alter table public.structure_edits enable row level security;
+alter table public.user_accounts enable row level security;
+alter table public.user_tracking enable row level security;
 
 -- Lecture publique
 create policy if not exists "structures_select_public"
@@ -58,6 +74,16 @@ using (true);
 
 create policy if not exists "structure_edits_select_public"
 on public.structure_edits
+for select
+using (true);
+
+create policy if not exists "user_accounts_select_public"
+on public.user_accounts
+for select
+using (true);
+
+create policy if not exists "user_tracking_select_public"
+on public.user_tracking
 for select
 using (true);
 
@@ -94,3 +120,34 @@ for update
 to anon
 using (true)
 with check (char_length(structure_id) > 0 and char_length(nom_structure) > 0);
+
+create policy if not exists "user_accounts_insert_public"
+on public.user_accounts
+for insert
+to anon
+with check (char_length(pseudo) > 0 and char_length(pin) > 0);
+
+create policy if not exists "user_accounts_delete_public"
+on public.user_accounts
+for delete
+to anon
+using (true);
+
+create policy if not exists "user_tracking_insert_public"
+on public.user_tracking
+for insert
+to anon
+with check (char_length(pseudo) > 0 and char_length(structure_id) > 0);
+
+create policy if not exists "user_tracking_update_public"
+on public.user_tracking
+for update
+to anon
+using (true)
+with check (char_length(pseudo) > 0 and char_length(structure_id) > 0);
+
+create policy if not exists "user_tracking_delete_public"
+on public.user_tracking
+for delete
+to anon
+using (true);

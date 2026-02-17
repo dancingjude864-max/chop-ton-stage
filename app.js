@@ -110,6 +110,7 @@ const el = {
   accountPseudoCreate: document.getElementById("accountPseudoCreate"),
   accountPinCreate: document.getElementById("accountPinCreate"),
   createAccountBtn: document.getElementById("createAccountBtn"),
+  accountPseudoLogin: document.getElementById("accountPseudoLogin"),
   accountPinLogin: document.getElementById("accountPinLogin"),
   unlockAccountBtn: document.getElementById("unlockAccountBtn"),
   lockAccountBtn: document.getElementById("lockAccountBtn"),
@@ -270,41 +271,84 @@ function setContribReturnTarget(structureId) {
 }
 
 function bindAccountActions() {
-  el.createAccountBtn.addEventListener("click", () => {
+  el.createAccountBtn.addEventListener("click", async () => {
     const pseudo = clean(el.accountPseudoCreate.value);
     const pin = clean(el.accountPinCreate.value);
     if (!pseudo || !pin) {
       setAccountStatus("Pseudo et PIN requis.", true);
       return;
     }
-    state.accountProfile = { pseudo, pin };
-    state.sessionPseudo = pseudo;
-    saveAccountProfile(state.accountProfile);
-    saveTrackingByUser(state.trackingByUser);
-    el.accountPseudoCreate.value = "";
-    el.accountPinCreate.value = "";
-    setAccountStatus(`Compte créé: ${pseudo}`);
-    renderAccountState();
-    renderResults();
-    if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
+    try {
+      if (supabaseClient) {
+        const { error } = await supabaseClient.from("user_accounts").insert([{ pseudo, pin }]);
+        if (error) {
+          const message = clean(error.message).toLowerCase();
+          if (message.includes("duplicate") || message.includes("unique")) {
+            setAccountStatus("Ce pseudo existe déjà. Utilisez Connexion.", true);
+            return;
+          }
+          throw error;
+        }
+      }
+      state.accountProfile = { pseudo, pin };
+      state.sessionPseudo = pseudo;
+      state.trackingByUser[pseudo] = await loadTrackingForPseudo(pseudo);
+      saveAccountProfile(state.accountProfile);
+      saveTrackingByUser(state.trackingByUser);
+      el.accountPseudoCreate.value = "";
+      el.accountPinCreate.value = "";
+      el.accountPseudoLogin.value = pseudo;
+      setAccountStatus(`Compte créé: ${pseudo}`);
+      renderAccountState();
+      renderResults();
+      if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
+    } catch (error) {
+      console.error(error);
+      setAccountStatus("Impossible de créer le compte pour le moment.", true);
+    }
   });
 
-  el.unlockAccountBtn.addEventListener("click", () => {
-    if (!state.accountProfile) {
-      setAccountStatus("Aucun compte à connecter.", true);
-      return;
-    }
+  el.unlockAccountBtn.addEventListener("click", async () => {
+    const pseudo = clean(el.accountPseudoLogin.value);
     const pin = clean(el.accountPinLogin.value);
-    if (pin !== state.accountProfile.pin) {
-      setAccountStatus("PIN incorrect.", true);
+    if (!pseudo || !pin) {
+      setAccountStatus("Pseudo et PIN requis pour la connexion.", true);
       return;
     }
-    state.sessionPseudo = state.accountProfile.pseudo;
-    el.accountPinLogin.value = "";
-    setAccountStatus(`Connecté en tant que ${state.sessionPseudo}.`);
-    renderAccountState();
-    renderResults();
-    if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
+    try {
+      if (supabaseClient) {
+        const { data, error } = await supabaseClient
+          .from("user_accounts")
+          .select("pseudo")
+          .eq("pseudo", pseudo)
+          .eq("pin", pin)
+          .limit(1);
+        if (error) throw error;
+        if (!Array.isArray(data) || data.length === 0) {
+          setAccountStatus("Pseudo ou PIN incorrect.", true);
+          return;
+        }
+      } else {
+        if (!state.accountProfile || pseudo !== state.accountProfile.pseudo || pin !== state.accountProfile.pin) {
+          setAccountStatus("Pseudo ou PIN incorrect.", true);
+          return;
+        }
+      }
+      state.accountProfile = { pseudo, pin };
+      state.sessionPseudo = pseudo;
+      state.trackingByUser[pseudo] = await loadTrackingForPseudo(pseudo);
+      saveAccountProfile(state.accountProfile);
+      saveTrackingByUser(state.trackingByUser);
+      el.accountPinLogin.value = "";
+      setAccountStatus(`Connecté en tant que ${state.sessionPseudo}.`);
+      renderAccountState();
+      renderResults();
+      if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
+      if (!el.personalView.classList.contains("hidden")) renderPersonalView();
+    } catch (error) {
+      console.error(error);
+      setAccountStatus("Impossible de se connecter pour le moment.", true);
+    }
   });
 
   el.lockAccountBtn.addEventListener("click", () => {
@@ -315,12 +359,22 @@ function bindAccountActions() {
     if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
   });
 
-  el.deleteAccountBtn.addEventListener("click", () => {
+  el.deleteAccountBtn.addEventListener("click", async () => {
     if (!state.accountProfile) return;
     const pseudo = state.accountProfile.pseudo;
+    try {
+      if (supabaseClient) {
+        await supabaseClient.from("user_tracking").delete().eq("pseudo", pseudo);
+        await supabaseClient.from("user_accounts").delete().eq("pseudo", pseudo);
+      }
+    } catch (error) {
+      console.error(error);
+    }
     delete state.trackingByUser[pseudo];
     state.accountProfile = null;
     state.sessionPseudo = null;
+    el.accountPseudoLogin.value = "";
+    el.accountPinLogin.value = "";
     saveTrackingByUser(state.trackingByUser);
     saveAccountProfile(null);
     setAccountStatus("Compte supprimé.");
@@ -331,20 +385,17 @@ function bindAccountActions() {
 }
 
 function renderAccountState() {
-  const hasAccount = Boolean(state.accountProfile);
   const isUnlocked = isTrackingEnabled();
-  el.accountCreateBlock.classList.toggle("hidden", hasAccount);
-  el.accountLoginBlock.classList.toggle("hidden", !hasAccount);
-
-  if (!hasAccount) {
-    el.accountStatus.textContent = "Aucun compte actif. Créez un compte pour suivre vos candidatures.";
-    return;
+  el.accountCreateBlock.classList.remove("hidden");
+  el.accountLoginBlock.classList.remove("hidden");
+  if (state.accountProfile?.pseudo && !clean(el.accountPseudoLogin.value)) {
+    el.accountPseudoLogin.value = state.accountProfile.pseudo;
   }
 
   if (isUnlocked) {
     el.accountStatus.textContent = `Compte actif: ${state.sessionPseudo}`;
   } else {
-    el.accountStatus.textContent = `Compte existant: ${state.accountProfile.pseudo} (PIN requis)`;
+    el.accountStatus.textContent = "Créez un compte ou connectez-vous avec un compte existant.";
   }
 }
 
@@ -368,8 +419,25 @@ function getTrackingStatus(structureId) {
   return map[structureId] || "";
 }
 
-function setTrackingStatus(structureId, status) {
+async function setTrackingStatus(structureId, status) {
   if (!isTrackingEnabled()) return false;
+  const pseudo = state.sessionPseudo;
+  if (!pseudo) return false;
+  if (supabaseClient) {
+    if (!status) {
+      const { error } = await supabaseClient
+        .from("user_tracking")
+        .delete()
+        .eq("pseudo", pseudo)
+        .eq("structure_id", structureId);
+      if (error) return false;
+    } else {
+      const { error } = await supabaseClient
+        .from("user_tracking")
+        .upsert([{ pseudo, structure_id: structureId, status }], { onConflict: "pseudo,structure_id" });
+      if (error) return false;
+    }
+  }
   if (!state.trackingByUser[state.sessionPseudo]) state.trackingByUser[state.sessionPseudo] = {};
   if (!status) delete state.trackingByUser[state.sessionPseudo][structureId];
   else state.trackingByUser[state.sessionPseudo][structureId] = status;
@@ -406,7 +474,7 @@ function renderTrackingControls(structureId, context) {
   `;
 }
 
-function onTrackingChange(event) {
+async function onTrackingChange(event) {
   const input = event.target.closest("[data-track-input]");
   if (!input) return;
   const structureId = clean(input.getAttribute("data-track-structure-id"));
@@ -419,11 +487,31 @@ function onTrackingChange(event) {
   }
 
   const checked = Boolean(input.checked);
-  if (checked) setTrackingStatus(structureId, value);
-  else if (getTrackingStatus(structureId) === value) setTrackingStatus(structureId, "");
+  if (checked) await setTrackingStatus(structureId, value);
+  else if (getTrackingStatus(structureId) === value) await setTrackingStatus(structureId, "");
   renderResults();
   if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
+}
+
+async function loadTrackingForPseudo(pseudo) {
+  if (!supabaseClient || !pseudo) {
+    const map = state.trackingByUser[pseudo];
+    return map && typeof map === "object" ? map : {};
+  }
+  const { data, error } = await supabaseClient
+    .from("user_tracking")
+    .select("structure_id,status")
+    .eq("pseudo", pseudo);
+  if (error) throw error;
+  const map = {};
+  (data || []).forEach((row) => {
+    const sid = clean(row.structure_id);
+    const status = clean(row.status);
+    if (!sid || !status) return;
+    map[sid] = status;
+  });
+  return map;
 }
 
 function renderPersonalView() {
