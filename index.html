@@ -7,6 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="min-h-screen bg-gradient-to-b from-amber-50 via-white to-cyan-50 text-slate-900">
+    <button
+      id="goSpreadsheet"
+      class="fixed right-4 top-4 z-20 rounded-lg border border-slate-300 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-100"
+    >
+      Tableur
+    </button>
+
     <header class="mx-auto max-w-6xl px-4 pt-10 pb-6 sm:px-6">
       <div class="mb-4 flex justify-end gap-2">
         <button id="goPersonal" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
@@ -26,7 +33,7 @@
 
     <main class="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
       <section id="homeView" class="rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 lg:grid-cols-3">
           <button
             id="goSearch"
             class="rounded-2xl border border-cyan-200 bg-cyan-600 px-4 py-6 text-left text-white transition hover:bg-cyan-700"
@@ -49,14 +56,6 @@
           >
             <span class="block text-lg font-bold">Renseigner une structure</span>
             <span class="mt-2 block text-sm text-emerald-100">Ajouter une nouvelle structure au site</span>
-          </button>
-
-          <button
-            id="goSpreadsheet"
-            class="rounded-2xl border border-slate-300 bg-slate-700 px-4 py-6 text-left text-white transition hover:bg-slate-800 sm:col-span-2"
-          >
-            <span class="block text-lg font-bold">Ouvrir le tableur local</span>
-            <span class="mt-2 block text-sm text-slate-200">Vue tableur des données + export CSV</span>
           </button>
         </div>
 
