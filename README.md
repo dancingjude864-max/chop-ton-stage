@@ -12,7 +12,15 @@ Le projet est prêt pour un stockage persistant via Supabase.
 - `Project URL`
 - `anon public key`
 4. Renseigne ces valeurs dans `config.js`.
-5. Commit + push, puis redeploy Vercel.
+5. Importe les structures CSV dans la table `public.structures`:
+
+```bash
+python3 scripts/import_structures_to_supabase.py \
+  --url "https://<PROJECT_REF>.supabase.co" \
+  --key "<ANON_PUBLIC_KEY>"
+```
+
+6. Commit + push, puis redeploy Vercel.
 
 Sans configuration Supabase, l'app reste en mode fallback local (navigateur / API locale).
 

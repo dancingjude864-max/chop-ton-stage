@@ -686,10 +686,17 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
 
 async function loadRemoteCsv() {
   try {
-    const response = await fetch(CSV_URL);
-    if (!response.ok) {
-      throw new Error(`Échec de chargement CSV (${response.status})`);
+    const supabaseStructures = await loadStructuresFromSupabase();
+    if (supabaseStructures && supabaseStructures.length) {
+      state.remoteData = supabaseStructures;
+      updateCount();
+      applyInitialRoute();
+      if (!el.searchView.classList.contains("hidden")) renderResults();
+      return;
     }
+
+    const response = await fetch(CSV_URL);
+    if (!response.ok) throw new Error(`Échec de chargement CSV (${response.status})`);
 
     const raw = await response.text();
     const rows = parseCsv(raw);
@@ -711,6 +718,56 @@ async function loadRemoteCsv() {
     el.structureCount.textContent = "Impossible de charger le CSV publié.";
     applyInitialRoute();
   }
+}
+
+async function loadStructuresFromSupabase() {
+  if (!supabaseClient) return null;
+  const { data, error } = await supabaseClient
+    .from("structures")
+    .select(`
+      structure_id,
+      secteur,
+      type_structure,
+      association,
+      departement,
+      nom_structure,
+      email_contact,
+      telephone_contact,
+      poste_contact,
+      genre_contact,
+      gratification,
+      ville,
+      type_public,
+      duree_stage,
+      diplome_associe,
+      missions,
+      ambiance,
+      conseils
+    `)
+    .order("nom_structure", { ascending: true })
+    .limit(50000);
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    structureId: clean(row.structure_id),
+    secteur: clean(row.secteur),
+    typeStructure: clean(row.type_structure),
+    association: clean(row.association),
+    departement: clean(row.departement),
+    nomStructure: clean(row.nom_structure),
+    email: clean(row.email_contact),
+    telephone: clean(row.telephone_contact),
+    poste: clean(row.poste_contact),
+    genre: normalizeGenre(row.genre_contact),
+    gratification: normalizeOuiNon(row.gratification),
+    ville: clean(row.ville),
+    typePublic: clean(row.type_public),
+    duree: clean(row.duree_stage),
+    diplome: clean(row.diplome_associe),
+    missions: clean(row.missions),
+    ambiance: clean(row.ambiance),
+    conseils: clean(row.conseils),
+    source: "Google Sheet",
+  })).filter((item) => item.nomStructure);
 }
 
 async function syncSharedState() {

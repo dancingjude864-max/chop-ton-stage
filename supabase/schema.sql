@@ -1,6 +1,31 @@
 -- CHOP' TON STAGE - schema minimal persistant
 create extension if not exists pgcrypto;
 
+create table if not exists public.structures (
+  id uuid primary key default gen_random_uuid(),
+  structure_id text not null unique,
+  secteur text not null default '',
+  type_structure text not null default '',
+  association text not null default '',
+  departement text not null default '',
+  nom_structure text not null default '',
+  email_contact text not null default '',
+  telephone_contact text not null default '',
+  poste_contact text not null default '',
+  genre_contact text not null default '',
+  gratification text not null default '',
+  ville text not null default '',
+  type_public text not null default '',
+  duree_stage text not null default '',
+  diplome_associe text not null default '',
+  missions text not null default '',
+  ambiance text not null default '',
+  conseils text not null default '',
+  source text not null default 'Google Sheet',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.contributions (
   id uuid primary key default gen_random_uuid(),
   entry jsonb not null,
@@ -14,11 +39,18 @@ create table if not exists public.structure_edits (
 );
 
 create index if not exists contributions_created_at_idx on public.contributions (created_at desc);
+create index if not exists structures_structure_id_idx on public.structures (structure_id);
 
+alter table public.structures enable row level security;
 alter table public.contributions enable row level security;
 alter table public.structure_edits enable row level security;
 
 -- Lecture publique
+create policy if not exists "structures_select_public"
+on public.structures
+for select
+using (true);
+
 create policy if not exists "contributions_select_public"
 on public.contributions
 for select
@@ -48,3 +80,17 @@ for update
 to anon
 using (true)
 with check (jsonb_typeof(edit) = 'object');
+
+-- Tableur structures éditable publiquement (sans login)
+create policy if not exists "structures_insert_public"
+on public.structures
+for insert
+to anon
+with check (char_length(structure_id) > 0 and char_length(nom_structure) > 0);
+
+create policy if not exists "structures_update_public"
+on public.structures
+for update
+to anon
+using (true)
+with check (char_length(structure_id) > 0 and char_length(nom_structure) > 0);
