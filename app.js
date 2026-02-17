@@ -78,6 +78,7 @@ const el = {
   searchView: document.getElementById("searchView"),
   detailView: document.getElementById("detailView"),
   personalView: document.getElementById("personalView"),
+  connectedView: document.getElementById("connectedView"),
   accountView: document.getElementById("accountView"),
   contribView: document.getElementById("contribView"),
   structureCount: document.getElementById("structureCount"),
@@ -105,7 +106,11 @@ const el = {
   detailContacts: document.getElementById("detailContacts"),
   detailExperiences: document.getElementById("detailExperiences"),
   personalMeta: document.getElementById("personalMeta"),
-  personalResults: document.getElementById("personalResults"),
+  personalInterestedResults: document.getElementById("personalInterestedResults"),
+  personalAppliedResults: document.getElementById("personalAppliedResults"),
+  connectedPseudo: document.getElementById("connectedPseudo"),
+  connectedToSearch: document.getElementById("connectedToSearch"),
+  connectedToPersonal: document.getElementById("connectedToPersonal"),
   accountStatus: document.getElementById("accountStatus"),
   accountModeCreateBtn: document.getElementById("accountModeCreateBtn"),
   accountModeLoginBtn: document.getElementById("accountModeLoginBtn"),
@@ -206,6 +211,15 @@ function bindNavigation() {
   el.backFromAccount.addEventListener("click", () => {
     showView("home");
   });
+  el.connectedToSearch.addEventListener("click", () => {
+    clearStructureParamInUrl();
+    showView("search");
+    renderResults();
+  });
+  el.connectedToPersonal.addEventListener("click", () => {
+    showView("personal");
+    renderPersonalView();
+  });
   el.backFromContrib.addEventListener("click", () => {
     if (state.contribReturnStructureId) {
       const structureId = state.contribReturnStructureId;
@@ -281,6 +295,7 @@ function showView(view) {
   el.searchView.classList.toggle("hidden", view !== "search");
   el.detailView.classList.toggle("hidden", view !== "detail");
   el.personalView.classList.toggle("hidden", view !== "personal");
+  el.connectedView.classList.toggle("hidden", view !== "connected");
   el.accountView.classList.toggle("hidden", view !== "account");
   el.contribView.classList.toggle("hidden", view !== "contrib");
 }
@@ -374,6 +389,8 @@ function bindAccountActions() {
       renderResults();
       if (!el.detailView.classList.contains("hidden") && state.activeStructureId) openStructureDetail(state.activeStructureId);
       if (!el.personalView.classList.contains("hidden")) renderPersonalView();
+      el.connectedPseudo.textContent = `Vous êtes connecté en tant que ${state.sessionPseudo}.`;
+      showView("connected");
     } catch (error) {
       console.error(error);
       setAccountStatus("Impossible de se connecter pour le moment.", true);
@@ -564,8 +581,10 @@ async function loadTrackingForPseudo(pseudo) {
 function renderPersonalView() {
   if (!isTrackingEnabled()) {
     el.personalMeta.textContent = "Connectez votre compte pour accéder à votre suivi.";
-    el.personalResults.innerHTML =
+    const msg =
       '<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Aucun compte connecté.</div>';
+    el.personalInterestedResults.innerHTML = msg;
+    el.personalAppliedResults.innerHTML = msg;
     return;
   }
 
@@ -573,8 +592,10 @@ function renderPersonalView() {
   const entries = Object.entries(tracking);
   if (!entries.length) {
     el.personalMeta.textContent = `Compte: ${state.sessionPseudo}`;
-    el.personalResults.innerHTML =
+    const msg =
       '<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Aucune structure suivie pour le moment.</div>';
+    el.personalInterestedResults.innerHTML = msg;
+    el.personalAppliedResults.innerHTML = msg;
     return;
   }
 
@@ -583,14 +604,21 @@ function renderPersonalView() {
   const items = entries
     .map(([id, status]) => ({ id, status, group: byId[id] || null }))
     .sort((a, b) => a.status.localeCompare(b.status));
+  const interestedItems = items.filter((item) => item.status === "interesse");
+  const appliedItems = items.filter((item) => item.status === "candidate");
 
-  el.personalMeta.textContent = `${items.length} structure(s) suivie(s) • Compte: ${state.sessionPseudo}`;
-  el.personalResults.innerHTML = items
-    .map((item) => {
-      const label = item.status === "candidate" ? "J'ai candidaté" : "Intéressé";
-      const name = item.group?.primary?.nomStructure || "Structure introuvable";
-      const city = item.group?.primary?.ville || "-";
-      return `
+  el.personalMeta.textContent = `${items.length} structure(s) suivie(s) • ${interestedItems.length} intéressé(es) • ${appliedItems.length} candidatures • Compte: ${state.sessionPseudo}`;
+
+  const renderList = (list, emptyText) => {
+    if (!list.length) {
+      return `<div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">${escapeHtml(emptyText)}</div>`;
+    }
+    return list
+      .map((item) => {
+        const label = item.status === "candidate" ? "J'ai candidaté" : "Intéressé";
+        const name = item.group?.primary?.nomStructure || "Structure introuvable";
+        const city = item.group?.primary?.ville || "-";
+        return `
         <article class="rounded-xl border border-slate-200 bg-white p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -603,8 +631,12 @@ function renderPersonalView() {
           </div>
         </article>
       `;
-    })
-    .join("");
+      })
+      .join("");
+  };
+
+  el.personalInterestedResults.innerHTML = renderList(interestedItems, "Aucune structure marquée comme intéressé.");
+  el.personalAppliedResults.innerHTML = renderList(appliedItems, "Aucune candidature enregistrée.");
 }
 
 function onPersonalResultsClick(event) {
@@ -652,7 +684,7 @@ function bindSearchFilters() {
   el.results.addEventListener("click", onResultsClick);
   el.results.addEventListener("change", onTrackingChange);
   el.detailTrackingControls.addEventListener("change", onTrackingChange);
-  el.personalResults.addEventListener("click", onPersonalResultsClick);
+  el.personalView.addEventListener("click", onPersonalResultsClick);
 }
 
 function bindContributionForm() {

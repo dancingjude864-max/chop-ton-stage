@@ -176,7 +176,29 @@
         </div>
         <h2 class="text-xl font-bold text-slate-900">Mon suivi de candidature</h2>
         <p id="personalMeta" class="mt-2 text-sm text-slate-600"></p>
-        <div id="personalResults" class="mt-4 grid gap-3"></div>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <section class="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+            <h3 class="text-sm font-bold text-amber-900">Structures intéressantes</h3>
+            <div id="personalInterestedResults" class="mt-3 grid gap-3"></div>
+          </section>
+          <section class="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+            <h3 class="text-sm font-bold text-emerald-900">Structures auxquelles j'ai candidaté</h3>
+            <div id="personalAppliedResults" class="mt-3 grid gap-3"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="connectedView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <h2 class="text-2xl font-black text-cyan-900">Connexion réussie</h2>
+        <p id="connectedPseudo" class="mt-2 text-sm text-slate-700"></p>
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button id="connectedToSearch" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700">
+            Aller à la recherche
+          </button>
+          <button id="connectedToPersonal" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
+            Voir mon suivi
+          </button>
+        </div>
       </section>
 
       <section id="accountView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
