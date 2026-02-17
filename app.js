@@ -628,6 +628,16 @@ function renderPersonalView() {
             <button data-open-structure="${escapeHtml(item.id)}" class="rounded-lg border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">
               Ouvrir la fiche
             </button>
+            <button
+              data-remove-tracking-id="${escapeHtml(item.id)}"
+              class="rounded-lg border border-red-400/50 px-2 py-1 text-sm text-red-300 hover:bg-red-500/10"
+              title="Retirer de la liste"
+              aria-label="Retirer de la liste"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+                <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"></path>
+              </svg>
+            </button>
           </div>
         </article>
       `;
@@ -639,7 +649,20 @@ function renderPersonalView() {
   el.personalAppliedResults.innerHTML = renderList(appliedItems, "Aucune candidature enregistrée.");
 }
 
-function onPersonalResultsClick(event) {
+async function onPersonalResultsClick(event) {
+  const removeBtn = event.target.closest("[data-remove-tracking-id]");
+  if (removeBtn) {
+    const structureIdToRemove = clean(removeBtn.getAttribute("data-remove-tracking-id"));
+    if (!structureIdToRemove) return;
+    await setTrackingStatus(structureIdToRemove, "");
+    renderPersonalView();
+    if (!el.searchView.classList.contains("hidden")) renderResults();
+    if (!el.detailView.classList.contains("hidden") && state.activeStructureId) {
+      openStructureDetail(state.activeStructureId);
+    }
+    return;
+  }
+
   const btn = event.target.closest("[data-open-structure]");
   if (!btn) return;
   const structureId = clean(btn.getAttribute("data-open-structure"));
