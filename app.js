@@ -65,6 +65,7 @@ const state = {
   accountProfile: loadAccountProfile(),
   trackingByUser: loadTrackingByUser(),
   sessionPseudo: null,
+  accountMode: "login",
   activeStructureId: null,
   contribReturnStructureId: null,
   routeApplied: false,
@@ -105,6 +106,8 @@ const el = {
   personalMeta: document.getElementById("personalMeta"),
   personalResults: document.getElementById("personalResults"),
   accountStatus: document.getElementById("accountStatus"),
+  accountModeCreateBtn: document.getElementById("accountModeCreateBtn"),
+  accountModeLoginBtn: document.getElementById("accountModeLoginBtn"),
   accountCreateBlock: document.getElementById("accountCreateBlock"),
   accountLoginBlock: document.getElementById("accountLoginBlock"),
   accountPseudoCreate: document.getElementById("accountPseudoCreate"),
@@ -271,6 +274,13 @@ function setContribReturnTarget(structureId) {
 }
 
 function bindAccountActions() {
+  el.accountModeCreateBtn.addEventListener("click", () => {
+    setAccountMode("create");
+  });
+  el.accountModeLoginBtn.addEventListener("click", () => {
+    setAccountMode("login");
+  });
+
   el.createAccountBtn.addEventListener("click", async () => {
     const pseudo = clean(el.accountPseudoCreate.value);
     const pin = clean(el.accountPinCreate.value);
@@ -298,6 +308,7 @@ function bindAccountActions() {
       el.accountPseudoCreate.value = "";
       el.accountPinCreate.value = "";
       el.accountPseudoLogin.value = pseudo;
+      setAccountMode("login");
       setAccountStatus(`Compte créé: ${pseudo}`);
       renderAccountState();
       renderResults();
@@ -340,6 +351,7 @@ function bindAccountActions() {
       saveAccountProfile(state.accountProfile);
       saveTrackingByUser(state.trackingByUser);
       el.accountPinLogin.value = "";
+      setAccountMode("login");
       setAccountStatus(`Connecté en tant que ${state.sessionPseudo}.`);
       renderAccountState();
       renderResults();
@@ -386,8 +398,7 @@ function bindAccountActions() {
 
 function renderAccountState() {
   const isUnlocked = isTrackingEnabled();
-  el.accountCreateBlock.classList.remove("hidden");
-  el.accountLoginBlock.classList.remove("hidden");
+  setAccountMode(state.accountMode || "login");
   if (state.accountProfile?.pseudo && !clean(el.accountPseudoLogin.value)) {
     el.accountPseudoLogin.value = state.accountProfile.pseudo;
   }
@@ -396,6 +407,25 @@ function renderAccountState() {
     el.accountStatus.textContent = `Compte actif: ${state.sessionPseudo}`;
   } else {
     el.accountStatus.textContent = "Créez un compte ou connectez-vous avec un compte existant.";
+  }
+}
+
+function setAccountMode(mode) {
+  state.accountMode = mode === "create" ? "create" : "login";
+  const isCreate = state.accountMode === "create";
+  el.accountCreateBlock.classList.toggle("hidden", !isCreate);
+  el.accountLoginBlock.classList.toggle("hidden", isCreate);
+
+  if (isCreate) {
+    el.accountModeCreateBtn.className =
+      "rounded-lg border border-cyan-300 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-800";
+    el.accountModeLoginBtn.className =
+      "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700";
+  } else {
+    el.accountModeCreateBtn.className =
+      "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700";
+    el.accountModeLoginBtn.className =
+      "rounded-lg border border-cyan-300 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-800";
   }
 }
 
