@@ -511,6 +511,7 @@ async function setTrackingStatus(structureId, status) {
 
 function renderTrackingControls(structureId, context) {
   if (!isTrackingEnabled()) {
+    if (context === "search") return "";
     return `
       <div data-track-control class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
         Créez/ouvrez un compte pour marquer cette structure (Intéressé ou J'ai candidaté).
