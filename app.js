@@ -1174,7 +1174,6 @@ function renderCard(item) {
           <h3 class="text-lg font-bold text-slate-100">${escapeHtml(structure.nomStructure)}</h3>
           <p class="text-sm text-slate-300">${escapeHtml(structure.association || "Association/Fondation non renseignée")}</p>
         </div>
-        <span class="rounded-full border border-indigo-400/40 px-2 py-1 text-xs text-indigo-200">${escapeHtml(item.sourceSummary)}</span>
       </div>
 
       <div class="mt-3 flex flex-wrap gap-2">${tags}</div>
