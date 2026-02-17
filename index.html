@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CHOP' TON STAGE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-amber-50 via-white to-cyan-50 text-slate-900">
+    <header class="mx-auto max-w-6xl px-4 pt-10 pb-6 sm:px-6">
+      <div class="mb-4 flex justify-end gap-2">
+        <button id="goPersonal" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
+          Mon espace
+        </button>
+        <button id="goAccount" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
+          Compte
+        </button>
+      </div>
+      <h1 class="text-center text-5xl font-black tracking-tight text-cyan-900 sm:text-7xl">
+        CHOP' TON STAGE
+      </h1>
+      <p class="mx-auto mt-4 max-w-2xl text-center text-sm text-slate-600 sm:text-base">
+        Plateforme collaborative pour trouver un stage en travail social.
+      </p>
+    </header>
+
+    <main class="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
+      <section id="homeView" class="rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <button
+            id="goSearch"
+            class="rounded-2xl border border-cyan-200 bg-cyan-600 px-4 py-6 text-left text-white transition hover:bg-cyan-700"
+          >
+            <span class="block text-lg font-bold">Chercher un stage</span>
+            <span id="structureCount" class="mt-2 block text-sm text-cyan-100">Chargement des structures...</span>
+          </button>
+
+          <button
+            id="goContribute"
+            class="rounded-2xl border border-amber-200 bg-amber-500 px-4 py-6 text-left text-white transition hover:bg-amber-600"
+          >
+            <span class="block text-lg font-bold">Partager mon expérience</span>
+            <span class="mt-2 block text-sm text-amber-100">Ajouter un retour d'expérience étudiant</span>
+          </button>
+
+          <button
+            id="goSpreadsheet"
+            class="rounded-2xl border border-slate-300 bg-slate-700 px-4 py-6 text-left text-white transition hover:bg-slate-800 sm:col-span-2"
+          >
+            <span class="block text-lg font-bold">Ouvrir le tableur local</span>
+            <span class="mt-2 block text-sm text-slate-200">Vue tableur des données + export CSV</span>
+          </button>
+        </div>
+
+        <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          <p>
+            Données chargées depuis un CSV publié (Google Sheet) + contributions étudiantes enregistrées localement.
+          </p>
+        </div>
+      </section>
+
+      <section id="searchView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <div class="mb-5 flex flex-wrap gap-2">
+          <button id="backFromSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Retour accueil
+          </button>
+          <button id="resetFilters" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Réinitialiser filtres
+          </button>
+        </div>
+
+        <div class="grid gap-4 rounded-2xl border border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label class="block text-sm">
+            <span class="mb-1 block font-semibold text-slate-700">Cherchez par type de structure</span>
+            <select id="filterTypeStructure" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+              <option value="">Tous</option>
+            </select>
+          </label>
+
+          <label class="block text-sm">
+            <span class="mb-1 block font-semibold text-slate-700">ou par secteur</span>
+            <select id="filterSecteur" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+              <option value="">Tous</option>
+            </select>
+          </label>
+
+          <label class="block text-sm">
+            <span class="mb-1 block font-semibold text-slate-700">Type de public</span>
+            <select id="filterPublicCategory" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+              <option value="">Tous</option>
+              <option value="adultes">Adultes</option>
+              <option value="mineurs">Mineurs</option>
+              <option value="petite enfance">Petite enfance</option>
+            </select>
+          </label>
+
+          <label class="block text-sm">
+            <span class="mb-1 block font-semibold text-slate-700">Localisation (ville ou département)</span>
+            <input
+              id="filterLocation"
+              type="text"
+              placeholder="Ex: Paris ou 75"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+        </div>
+        <div class="mt-4 rounded-2xl border border-slate-200 p-4">
+          <label class="block text-sm">
+            <span class="mb-1 block font-semibold text-slate-700">Mot-clé</span>
+            <input
+              id="filterKeyword"
+              type="text"
+              placeholder="Ex: mission, CHRS, Paris, DE ES, etc."
+              class="w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+        </div>
+
+        <p id="resultMeta" class="mt-4 text-sm text-slate-600"></p>
+        <div id="results" class="mt-4 grid gap-4"></div>
+      </section>
+
+      <section id="detailView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <div class="mb-5 flex flex-wrap gap-2">
+          <button id="detailToSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Retour à la recherche
+          </button>
+          <button id="detailToHome" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Retour accueil
+          </button>
+          <button id="detailEditStructure" class="rounded-lg border border-cyan-300 px-3 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-50">
+            Modifier les détails de la structure
+          </button>
+          <button id="detailAddContact" class="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+            Ajouter un contact
+          </button>
+          <button id="detailAddExperience" class="rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+            Ajouter mon expérience
+          </button>
+        </div>
+
+        <div id="detailTrackingControls" class="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3"></div>
+
+        <div class="rounded-2xl border border-slate-200 p-4">
+          <h2 id="detailName" class="text-2xl font-bold text-slate-900"></h2>
+          <p id="detailAssociation" class="mt-1 text-sm text-slate-600"></p>
+          <div id="detailBadges" class="mt-3 flex flex-wrap gap-2"></div>
+          <div id="detailMeta" class="mt-4 grid gap-4 text-sm sm:grid-cols-2"></div>
+          <div id="detailTexts" class="mt-4 grid gap-2 text-sm text-slate-700"></div>
+        </div>
+
+        <div class="mt-6 rounded-2xl border border-slate-200 p-4">
+          <h3 class="text-lg font-bold text-slate-900">Contacts</h3>
+          <div id="detailContacts" class="mt-3 grid gap-3 sm:grid-cols-2"></div>
+        </div>
+
+        <div class="mt-6 rounded-2xl border border-slate-200 p-4">
+          <h3 class="text-lg font-bold text-slate-900">Expériences étudiantes</h3>
+          <div id="detailExperiences" class="mt-3 grid gap-3"></div>
+        </div>
+      </section>
+
+      <section id="personalView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <div class="mb-5 flex flex-wrap gap-2">
+          <button id="backFromPersonal" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Retour accueil
+          </button>
+        </div>
+        <h2 class="text-xl font-bold text-slate-900">Mon suivi de candidature</h2>
+        <p id="personalMeta" class="mt-2 text-sm text-slate-600"></p>
+        <div id="personalResults" class="mt-4 grid gap-3"></div>
+      </section>
+
+      <section id="accountView" class="hidden rounded-3xl border border-cyan-100 bg-white/90 p-5 shadow-lg shadow-cyan-100 sm:p-8">
+        <div class="mb-5 flex flex-wrap gap-2">
+          <button id="backFromAccount" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Retour accueil
+          </button>
+        </div>
+        <h2 class="text-xl font-bold text-slate-900">Compte (optionnel)</h2>
+        <p class="mt-1 text-sm text-slate-600">Créez un compte local avec pseudo + PIN pour suivre vos candidatures.</p>
+        <p id="accountStatus" class="mt-3 text-sm text-slate-700"></p>
+
+        <div id="accountCreateBlock" class="mt-4 rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-900">Créer un compte</h3>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <label class="text-sm">Pseudo
+              <input id="accountPseudoCreate" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+            </label>
+            <label class="text-sm">Code PIN
+              <input id="accountPinCreate" type="password" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+            </label>
+          </div>
+          <button id="createAccountBtn" class="mt-3 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700">
+            Créer le compte
+          </button>
+        </div>
+
+        <div id="accountLoginBlock" class="mt-4 rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-900">Connexion</h3>
+          <label class="mt-3 block text-sm">Code PIN
+            <input id="accountPinLogin" type="password" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 sm:w-64" />
+          </label>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button id="unlockAccountBtn" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700">
+              Se connecter
+            </button>
+            <button id="lockAccountBtn" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">
+              Se déconnecter
+            </button>
+            <button id="deleteAccountBtn" class="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+              Supprimer le compte
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="contribView" class="hidden rounded-3xl border border-amber-100 bg-white/90 p-5 shadow-lg shadow-amber-100 sm:p-8">
+        <div class="mb-5">
+          <button id="backFromContrib" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+            Retour accueil
+          </button>
+        </div>
+
+        <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p class="font-semibold">Important</p>
+          <p>
+            Ne partagez pas de noms/prénoms ni d'informations personnelles identifiables. Renseignez uniquement des
+            coordonnées professionnelles génériques.
+          </p>
+        </div>
+
+        <form id="contribForm" class="space-y-8" novalidate>
+          <fieldset id="contribStructureDetails" class="space-y-4">
+            <legend class="mb-2 text-lg font-bold">Informations sur la structure</legend>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="text-sm font-medium">Nom de la structure *
+                <input required name="nomStructure" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              <label class="text-sm font-medium">Association/Fondation
+                <input name="association" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              <label class="text-sm font-medium">Ville *
+                <input required name="ville" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              <label class="text-sm font-medium">Code postal (2 chiffres) *
+                <input required name="departement" pattern="^[0-9]{2}$" maxlength="2" inputmode="numeric" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              <label class="text-sm font-medium">Type de structure *
+                <select required id="contribTypeStructure" name="typeStructure" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></select>
+              </label>
+
+              <label id="otherTypeWrap" class="hidden text-sm font-medium">Précisez le type de structure *
+                <input id="otherTypeInput" name="typeStructureAutre" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              <label class="text-sm font-medium">Secteur d'intervention *
+                <select required id="contribSecteur" name="secteur" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></select>
+              </label>
+
+              <label class="text-sm font-medium">Type de public *
+                <select required id="contribPublic" name="typePublic" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" disabled></select>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset id="contribContactDetails" class="space-y-4">
+            <legend class="mb-2 text-lg font-bold">Contact professionnel</legend>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="text-sm font-medium">Genre du contact *
+                <select required name="genre" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="">Sélectionner</option>
+                  <option value="Madame">Madame</option>
+                  <option value="Monsieur">Monsieur</option>
+                  <option value="Neutre">Neutre</option>
+                </select>
+              </label>
+            </div>
+
+            <div>
+              <p class="text-sm font-medium">Fonction(s)/Poste(s) * (au moins une)</p>
+              <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="postes" value="Travailleur social" />Travailleur social</label>
+                <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="postes" value="Chef de service" />Chef de service</label>
+                <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="postes" value="Directeur" />Directeur</label>
+                <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="postes" value="Secrétariat" />Secrétariat</label>
+                <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="postes" value="Autre" />Autre</label>
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="text-sm font-medium">Email professionnel
+                <input type="email" name="email" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              <label class="text-sm font-medium">Téléphone professionnel
+                <input type="tel" name="telephone" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset id="contribStageDetails" class="space-y-4">
+            <legend class="mb-2 text-lg font-bold">Détails du stage</legend>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="text-sm font-medium">Diplôme associé *
+                <select required name="diplome" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="">Sélectionner</option>
+                  <option>DE ASS</option>
+                  <option>DE ES</option>
+                  <option>DE EJE</option>
+                  <option>DE ME</option>
+                  <option>Autre</option>
+                </select>
+              </label>
+
+              <div>
+                <p class="text-sm font-medium">Stage gratifié *
+                </p>
+                <div class="mt-2 flex flex-wrap gap-4">
+                  <label class="inline-flex items-center gap-2 text-sm"><input required type="radio" name="gratification" value="Oui" />Oui</label>
+                  <label class="inline-flex items-center gap-2 text-sm"><input required type="radio" name="gratification" value="Non" />Non</label>
+                  <label class="inline-flex items-center gap-2 text-sm"><input required type="radio" name="gratification" value="Alternance" />Alternance</label>
+                </div>
+              </div>
+
+              <label class="text-sm font-medium">Durée du stage (semaines) *
+                <input required type="number" min="1" max="52" name="duree" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <span id="dureeHint" class="mt-1 block text-xs text-slate-500"></span>
+              </label>
+            </div>
+
+            <div class="grid gap-4">
+              <label class="text-sm font-medium">Ambiance de travail
+                <textarea name="ambiance" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+              </label>
+
+              <label class="text-sm font-medium">Conseils pour la candidature
+                <textarea name="conseils" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="flex items-center gap-3">
+            <button id="contribSubmitBtn" type="submit" class="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">
+              Enregistrer ma contribution
+            </button>
+            <p id="contribStatus" class="text-sm text-slate-600"></p>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
