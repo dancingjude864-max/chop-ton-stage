@@ -58,13 +58,16 @@ function bindEvents() {
 
 async function loadRows() {
   try {
-    const response = await fetch(CSV_URL);
-    if (!response.ok) throw new Error(`CSV HTTP ${response.status}`);
-    const raw = await response.text();
-    const parsed = parseCsv(raw);
-    const hasHeader = parsed[0] && parsed[0][0] && parsed[0][0].toLowerCase().includes("secteur");
-    const dataRows = hasHeader ? parsed.slice(1) : parsed;
-    const remoteRows = dataRows.map(toRowObject).filter((row) => row[4]);
+    let remoteRows = await loadStructuresRowsFromSupabase();
+    if (!remoteRows || !remoteRows.length) {
+      const response = await fetch(CSV_URL);
+      if (!response.ok) throw new Error(`CSV HTTP ${response.status}`);
+      const raw = await response.text();
+      const parsed = parseCsv(raw);
+      const hasHeader = parsed[0] && parsed[0][0] && parsed[0][0].toLowerCase().includes("secteur");
+      const dataRows = hasHeader ? parsed.slice(1) : parsed;
+      remoteRows = dataRows.map(toRowObject).filter((row) => row[4]);
+    }
 
     const sharedContribs = await loadSharedContributions();
     const sharedEdits = await loadSharedStructureEdits();
@@ -78,6 +81,51 @@ async function loadRows() {
     console.error(error);
     el.sheetMeta.textContent = "Impossible de charger les données.";
   }
+}
+
+async function loadStructuresRowsFromSupabase() {
+  if (!supabaseClient) return null;
+  const { data, error } = await supabaseClient
+    .from("structures")
+    .select(`
+      secteur,
+      type_structure,
+      association,
+      departement,
+      nom_structure,
+      email_contact,
+      telephone_contact,
+      poste_contact,
+      genre_contact,
+      gratification,
+      ville,
+      type_public,
+      duree_stage,
+      diplome_associe
+    `)
+    .order("nom_structure", { ascending: true })
+    .limit(50000);
+  if (error) {
+    console.error(error);
+    return null;
+  }
+  return (data || []).map((row) => [
+    clean(row.secteur),
+    clean(row.type_structure),
+    clean(row.association),
+    clean(row.departement),
+    clean(row.nom_structure),
+    clean(row.email_contact),
+    clean(row.telephone_contact),
+    clean(row.poste_contact),
+    clean(row.genre_contact),
+    clean(row.gratification),
+    clean(row.ville),
+    clean(row.type_public),
+    clean(row.duree_stage),
+    clean(row.diplome_associe),
+    "Google Sheet",
+  ]).filter((row) => row[4]);
 }
 
 function renderHeader() {

@@ -779,20 +779,37 @@ function bindContributionForm() {
 
     let savedRemotely = false;
     if (state.contributionMode === "edit_structure" && state.editingStructureId) {
-      state.structureEdits[state.editingStructureId] = {
-        secteur: entry.secteur,
-        typeStructure: entry.typeStructure,
-        association: entry.association,
-        departement: entry.departement,
-        nomStructure: entry.nomStructure,
-        ville: entry.ville,
-        typePublic: entry.typePublic,
-      };
-      savedRemotely = await persistStructureEdit(
-        state.editingStructureId,
-        state.structureEdits[state.editingStructureId]
-      );
-      saveStructureEdits(state.structureEdits);
+      if (supabaseClient) {
+        savedRemotely = await persistStructureRecord(state.editingStructureId, entry);
+        if (savedRemotely) {
+          const idx = state.remoteData.findIndex((r) => makeStructureId(r) === state.editingStructureId);
+          if (idx >= 0) state.remoteData[idx] = { ...state.remoteData[idx], ...entry, structureId: state.editingStructureId, source: "Google Sheet" };
+        }
+      } else {
+        state.structureEdits[state.editingStructureId] = {
+          secteur: entry.secteur,
+          typeStructure: entry.typeStructure,
+          association: entry.association,
+          departement: entry.departement,
+          nomStructure: entry.nomStructure,
+          ville: entry.ville,
+          typePublic: entry.typePublic,
+        };
+        savedRemotely = await persistStructureEdit(
+          state.editingStructureId,
+          state.structureEdits[state.editingStructureId]
+        );
+        saveStructureEdits(state.structureEdits);
+      }
+    } else if (state.contributionMode === "new_structure") {
+      const structureId = makeStructureId(entry);
+      const structureRecord = { ...entry, structureId, source: "Google Sheet" };
+      if (supabaseClient) {
+        savedRemotely = await persistStructureRecord(structureId, structureRecord);
+      } else {
+        savedRemotely = false;
+      }
+      state.remoteData.push(structureRecord);
     } else {
       state.localContribs.unshift(entry);
       savedRemotely = await persistContribution(entry);
@@ -904,6 +921,15 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
 
 async function loadRemoteCsv() {
   try {
+    const supabaseStructures = await loadStructuresFromSupabase();
+    if (supabaseStructures && supabaseStructures.length) {
+      state.remoteData = supabaseStructures;
+      updateCount();
+      applyInitialRoute();
+      if (!el.searchView.classList.contains("hidden")) renderResults();
+      return;
+    }
+
     const response = await fetch(CSV_URL);
     if (!response.ok) throw new Error(`Échec de chargement CSV (${response.status})`);
 
@@ -927,6 +953,61 @@ async function loadRemoteCsv() {
     el.structureCount.textContent = "Impossible de charger le CSV publié.";
     applyInitialRoute();
   }
+}
+
+async function loadStructuresFromSupabase() {
+  if (!supabaseClient) return null;
+  const { data, error } = await supabaseClient
+    .from("structures")
+    .select(`
+      structure_id,
+      secteur,
+      type_structure,
+      association,
+      departement,
+      nom_structure,
+      email_contact,
+      telephone_contact,
+      poste_contact,
+      genre_contact,
+      gratification,
+      ville,
+      type_public,
+      duree_stage,
+      diplome_associe,
+      missions,
+      ambiance,
+      conseils
+    `)
+    .order("nom_structure", { ascending: true })
+    .limit(50000);
+  if (error) {
+    console.error(error);
+    return null;
+  }
+  return (data || [])
+    .map((row) => ({
+      structureId: clean(row.structure_id),
+      secteur: clean(row.secteur),
+      typeStructure: clean(row.type_structure),
+      association: clean(row.association),
+      departement: clean(row.departement),
+      nomStructure: clean(row.nom_structure),
+      email: clean(row.email_contact),
+      telephone: clean(row.telephone_contact),
+      poste: clean(row.poste_contact),
+      genre: clean(row.genre_contact),
+      gratification: clean(row.gratification),
+      ville: normalizeVilleByDepartement(clean(row.ville), clean(row.departement)),
+      typePublic: clean(row.type_public),
+      duree: clean(row.duree_stage),
+      diplome: clean(row.diplome_associe),
+      missions: clean(row.missions),
+      ambiance: clean(row.ambiance),
+      conseils: clean(row.conseils),
+      source: "Google Sheet",
+    }))
+    .filter((item) => item.nomStructure);
 }
 
 async function syncSharedState() {
@@ -1935,6 +2016,35 @@ async function persistStructureEdit(structureId, edit) {
   } catch {
     return false;
   }
+}
+
+async function persistStructureRecord(structureId, record) {
+  if (!supabaseClient || !structureId) return false;
+  const payload = {
+    structure_id: clean(structureId),
+    secteur: clean(record.secteur),
+    type_structure: clean(record.typeStructure),
+    association: clean(record.association),
+    departement: clean(record.departement),
+    nom_structure: clean(record.nomStructure),
+    email_contact: clean(record.email),
+    telephone_contact: clean(record.telephone),
+    poste_contact: clean(record.poste),
+    genre_contact: clean(record.genre),
+    gratification: clean(record.gratification),
+    ville: normalizeVilleByDepartement(clean(record.ville), clean(record.departement)),
+    type_public: clean(record.typePublic),
+    duree_stage: clean(record.duree),
+    diplome_associe: clean(record.diplome),
+    missions: clean(record.missions),
+    ambiance: clean(record.ambiance),
+    conseils: clean(record.conseils),
+    source: "Google Sheet",
+  };
+  const { error } = await supabaseClient
+    .from("structures")
+    .upsert([payload], { onConflict: "structure_id" });
+  return !error;
 }
 
 async function apiGet(url) {
