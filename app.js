@@ -1653,12 +1653,17 @@ function extractContacts(records, edit) {
 }
 
 function getContactAvailabilityLabel(contacts) {
-  const hasEmail = contacts.some((c) => c.email);
-  const hasTel = contacts.some((c) => c.telephone);
+  const hasEmail = contacts.some((c) => !isMissingContactValue(c.email));
+  const hasTel = contacts.some((c) => !isMissingContactValue(c.telephone));
   if (hasEmail && hasTel) return "email et téléphone renseignés";
   if (hasEmail) return "email renseigné, téléphone non renseigné";
   if (hasTel) return "téléphone renseigné, email non renseigné";
   return "email et téléphone non renseignés";
+}
+
+function isMissingContactValue(value) {
+  const v = clean(value);
+  return !v || v === "----";
 }
 
 function renderContactsForStructure(group) {
