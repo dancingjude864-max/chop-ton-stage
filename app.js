@@ -100,6 +100,9 @@ const el = {
   detailAddContact: document.getElementById("detailAddContact"),
   detailAddExperience: document.getElementById("detailAddExperience"),
   detailFlagStructure: document.getElementById("detailFlagStructure"),
+  detailFlagMenu: document.getElementById("detailFlagMenu"),
+  detailReportErrorBtn: document.getElementById("detailReportErrorBtn"),
+  detailDeleteStructureBtn: document.getElementById("detailDeleteStructureBtn"),
   detailName: document.getElementById("detailName"),
   detailAssociation: document.getElementById("detailAssociation"),
   detailBadges: document.getElementById("detailBadges"),
@@ -280,7 +283,17 @@ function bindNavigation() {
     el.contribStatus.textContent = "Ajoutez un contact pour cette structure.";
     el.contribStatus.className = "text-sm text-emerald-700";
   });
-  el.detailFlagStructure.addEventListener("click", onDetailFlagStructure);
+  el.detailFlagStructure.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleFlagMenu();
+  });
+  el.detailReportErrorBtn.addEventListener("click", onReportStructureError);
+  el.detailDeleteStructureBtn.addEventListener("click", onDeleteStructureFromDetail);
+  document.addEventListener("click", (event) => {
+    const insideMenu = event.target.closest("#detailFlagMenu");
+    const onTrigger = event.target.closest("#detailFlagStructure");
+    if (!insideMenu && !onTrigger) closeFlagMenu();
+  });
 
   el.resetFilters.addEventListener("click", () => {
     el.filterTypeStructure.value = "";
@@ -302,6 +315,7 @@ function showView(view) {
   el.connectedView.classList.toggle("hidden", view !== "connected");
   el.accountView.classList.toggle("hidden", view !== "account");
   el.contribView.classList.toggle("hidden", view !== "contrib");
+  if (view !== "detail") closeFlagMenu();
 }
 
 function setContribReturnTarget(structureId) {
@@ -1761,39 +1775,24 @@ async function onDetailContactsClick(event) {
   if (state.activeStructureId) openStructureDetail(state.activeStructureId);
 }
 
-async function onDetailFlagStructure() {
+function toggleFlagMenu() {
+  if (el.detailFlagMenu.classList.contains("hidden")) {
+    el.detailFlagMenu.classList.remove("hidden");
+  } else {
+    el.detailFlagMenu.classList.add("hidden");
+  }
+}
+
+function closeFlagMenu() {
+  el.detailFlagMenu.classList.add("hidden");
+}
+
+async function onReportStructureError() {
+  closeFlagMenu();
   const structureId = clean(state.activeStructureId);
   if (!structureId) return;
   const group = findStructureGroupById(structureId);
   if (!group) return;
-
-  const choice = window.prompt(
-    "Choisissez une action :\n1 = Signaler une erreur dans la fiche\n2 = Supprimer la structure"
-  );
-  if (choice === null) return;
-  const normalizedChoice = normalizeForSearch(choice);
-  const isDelete = normalizedChoice === "2" || normalizedChoice.includes("supprimer");
-  const isReport = normalizedChoice === "1" || normalizedChoice.includes("signaler") || normalizedChoice.includes("erreur");
-
-  if (!isDelete && !isReport) {
-    window.alert("Choix invalide. Entrez 1 ou 2.");
-    return;
-  }
-
-  if (isDelete) {
-    const confirmed = window.confirm("Voulez-vous vraiment supprimer cette structure de la base de données ?");
-    if (!confirmed) return;
-    const deleted = await deleteStructureAndRelatedData(structureId, group.primary);
-    if (!deleted) {
-      window.alert("Suppression impossible pour le moment.");
-      return;
-    }
-    window.alert("Structure supprimée.");
-    clearStructureParamInUrl();
-    showView("search");
-    renderResults();
-    return;
-  }
 
   const details = window.prompt("Décrivez brièvement l'erreur constatée (optionnel) :", "");
   const reportEntry = {
@@ -1814,6 +1813,26 @@ async function onDetailFlagStructure() {
       ? "Signalement enregistré."
       : "Signalement enregistré localement uniquement."
   );
+}
+
+async function onDeleteStructureFromDetail() {
+  closeFlagMenu();
+  const structureId = clean(state.activeStructureId);
+  if (!structureId) return;
+  const group = findStructureGroupById(structureId);
+  if (!group) return;
+
+  const confirmed = window.confirm("Voulez-vous vraiment supprimer cette structure de la base de données ?");
+  if (!confirmed) return;
+  const deleted = await deleteStructureAndRelatedData(structureId, group.primary);
+  if (!deleted) {
+    window.alert("Suppression impossible pour le moment.");
+    return;
+  }
+  window.alert("Structure supprimée.");
+  clearStructureParamInUrl();
+  showView("search");
+  renderResults();
 }
 
 function belongsToStructure(entry, structureId, structureBaseId) {
