@@ -54,6 +54,7 @@ function init() {
 function bindEvents() {
   el.sheetFilter.addEventListener("input", renderRows);
   el.downloadCsv.addEventListener("click", downloadCsv);
+  el.sheetBody.addEventListener("click", onSheetBodyClick);
 }
 
 async function loadRows() {
@@ -88,6 +89,7 @@ async function loadStructuresRowsFromSupabase() {
   const { data, error } = await supabaseClient
     .from("structures")
     .select(`
+      structure_id,
       secteur,
       type_structure,
       association,
@@ -125,32 +127,44 @@ async function loadStructuresRowsFromSupabase() {
     clean(row.duree_stage),
     clean(row.diplome_associe),
     "Google Sheet",
+    clean(row.structure_id),
   ]).filter((row) => row[4]);
 }
 
 function renderHeader() {
-  el.sheetHead.innerHTML = `<tr>${HEADERS.map((h) => `<th class="whitespace-nowrap border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700">${escapeHtml(h)}</th>`).join("")}</tr>`;
+  el.sheetHead.innerHTML = `<tr>${[...HEADERS, "Actions"]
+    .map((h) => `<th class="whitespace-nowrap border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700">${escapeHtml(h)}</th>`)
+    .join("")}</tr>`;
 }
 
 function renderRows() {
   const q = normalizeForSearch(el.sheetFilter.value);
   const filtered = !q
     ? state.rows
-    : state.rows.filter((row) => normalizeForSearch(row.join(" ")).includes(q));
+    : state.rows.filter((row) => normalizeForSearch(row.cells.join(" ")).includes(q));
 
   el.sheetMeta.textContent = `${filtered.length} ligne(s) affichée(s) sur ${state.rows.length}`;
 
   if (!filtered.length) {
-    el.sheetBody.innerHTML = `<tr><td colspan="${HEADERS.length}" class="px-3 py-4 text-sm text-slate-600">Aucune ligne trouvée.</td></tr>`;
+    el.sheetBody.innerHTML = `<tr><td colspan="${HEADERS.length + 1}" class="px-3 py-4 text-sm text-slate-600">Aucune ligne trouvée.</td></tr>`;
     return;
   }
 
   el.sheetBody.innerHTML = filtered
     .map(
       (row) =>
-        `<tr class="odd:bg-white even:bg-slate-50">${row
+        `<tr class="odd:bg-white even:bg-slate-50">${row.cells
           .map((cell) => `<td class="whitespace-pre-line border-b border-slate-100 px-3 py-2 align-top">${escapeHtml(cell)}</td>`)
-          .join("")}</tr>`
+          .join("")}
+          <td class="border-b border-slate-100 px-3 py-2 align-top">
+            <button
+              data-delete-structure-id="${escapeHtml(row.id)}"
+              class="rounded-lg border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+            >
+              Supprimer
+            </button>
+          </td>
+        </tr>`
     )
     .join("");
 }
@@ -159,34 +173,37 @@ function aggregateRowsByStructure(rows) {
   const grouped = new Map();
 
   rows.forEach((row) => {
-    const id = makeStructureIdFromRow(row);
+    const id = clean(row[15]) || makeStructureIdFromRow(row);
     if (!grouped.has(id)) grouped.set(id, []);
     grouped.get(id).push(row);
   });
 
-  return [...grouped.values()].map((structureRows) => {
+  return [...grouped.entries()].map(([id, structureRows]) => {
     const contactColumns = buildAlignedContactColumns(structureRows);
     const source = structureRows.some((r) => normalizeForSearch(r[14]).includes("contribution"))
       ? "Google Sheet + contributions"
       : "Google Sheet";
 
-    return [
-      firstNonEmpty(structureRows, 0),
-      firstNonEmpty(structureRows, 1),
-      firstNonEmpty(structureRows, 2),
-      firstNonEmpty(structureRows, 3),
-      firstNonEmpty(structureRows, 4),
-      contactColumns.emails,
-      contactColumns.phones,
-      contactColumns.postes,
-      contactColumns.genres,
-      firstNonEmpty(structureRows, 9),
-      firstNonEmpty(structureRows, 10),
-      firstNonEmpty(structureRows, 11),
-      firstNonEmpty(structureRows, 12),
-      firstNonEmpty(structureRows, 13),
-      source,
-    ];
+    return {
+      id,
+      cells: [
+        firstNonEmpty(structureRows, 0),
+        firstNonEmpty(structureRows, 1),
+        firstNonEmpty(structureRows, 2),
+        firstNonEmpty(structureRows, 3),
+        firstNonEmpty(structureRows, 4),
+        contactColumns.emails,
+        contactColumns.phones,
+        contactColumns.postes,
+        contactColumns.genres,
+        firstNonEmpty(structureRows, 9),
+        firstNonEmpty(structureRows, 10),
+        firstNonEmpty(structureRows, 11),
+        firstNonEmpty(structureRows, 12),
+        firstNonEmpty(structureRows, 13),
+        source,
+      ],
+    };
   });
 }
 
@@ -237,7 +254,7 @@ function buildAlignedContactColumns(rows) {
 }
 
 function toRowObject(cols) {
-  return [
+  const base = [
     clean(cols[0]),
     clean(cols[1]),
     clean(cols[2]),
@@ -254,10 +271,15 @@ function toRowObject(cols) {
     clean(cols[13]),
     "Google Sheet",
   ];
+  const structureId = makeStructureIdFromRow(base);
+  return [
+    ...base,
+    structureId,
+  ];
 }
 
 function toLocalTableRow(entry) {
-  return [
+  const row = [
     clean(entry.secteur),
     clean(entry.typeStructure),
     clean(entry.association),
@@ -274,10 +296,11 @@ function toLocalTableRow(entry) {
     clean(entry.diplome),
     "Contribution étudiante",
   ];
+  return [...row, clean(entry.structureId) || makeStructureIdFromRow(row)];
 }
 
 function applyStructureEdit(row, edits) {
-  const id = makeStructureIdFromRow(row);
+  const id = clean(row[15]) || makeStructureIdFromRow(row);
   const edit = edits[id];
   if (!edit) return row;
 
@@ -297,7 +320,7 @@ function makeStructureIdFromRow(row) {
 }
 
 function downloadCsv() {
-  const csvContent = [HEADERS, ...state.rows]
+  const csvContent = [HEADERS, ...state.rows.map((row) => row.cells)]
     .map((row) => row.map(csvEscape).join(","))
     .join("\n");
 
@@ -310,6 +333,37 @@ function downloadCsv() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+async function onSheetBodyClick(event) {
+  const btn = event.target.closest("[data-delete-structure-id]");
+  if (!btn) return;
+  const structureId = clean(btn.getAttribute("data-delete-structure-id"));
+  if (!structureId) return;
+
+  if (!supabaseClient) {
+    window.alert("Suppression indisponible sans connexion Supabase.");
+    return;
+  }
+
+  const confirmed = window.confirm("Voulez-vous vraiment supprimer cette structure ?");
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient.from("structures").delete().eq("structure_id", structureId);
+  if (error) {
+    console.error(error);
+    window.alert("Suppression impossible pour le moment.");
+    return;
+  }
+
+  await Promise.allSettled([
+    supabaseClient.from("structure_edits").delete().eq("structure_id", structureId),
+    supabaseClient.from("user_tracking").delete().eq("structure_id", structureId),
+    supabaseClient.from("contributions").delete().filter("entry->>structureId", "eq", structureId),
+  ]);
+
+  state.rows = state.rows.filter((row) => row.id !== structureId);
+  renderRows();
 }
 
 function csvEscape(value) {

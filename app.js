@@ -56,6 +56,8 @@ const TYPE_STRUCTURES = [
   "Autre",
 ];
 
+const IDF_DEPARTEMENTS = ["75", "77", "78", "91", "92", "93", "94", "95"];
+
 const PUBLIC_CATEGORIES = ["adultes", "mineurs", "petite enfance"];
 
 const state = {
@@ -97,6 +99,7 @@ const el = {
   detailEditStructure: document.getElementById("detailEditStructure"),
   detailAddContact: document.getElementById("detailAddContact"),
   detailAddExperience: document.getElementById("detailAddExperience"),
+  detailFlagStructure: document.getElementById("detailFlagStructure"),
   detailName: document.getElementById("detailName"),
   detailAssociation: document.getElementById("detailAssociation"),
   detailBadges: document.getElementById("detailBadges"),
@@ -277,6 +280,7 @@ function bindNavigation() {
     el.contribStatus.textContent = "Ajoutez un contact pour cette structure.";
     el.contribStatus.className = "text-sm text-emerald-700";
   });
+  el.detailFlagStructure.addEventListener("click", onDetailFlagStructure);
 
   el.resetFilters.addEventListener("click", () => {
     el.filterTypeStructure.value = "";
@@ -675,12 +679,10 @@ async function onPersonalResultsClick(event) {
 }
 
 function setupStaticSelects() {
-  fillSelect(el.filterTypeStructure, ["", ...TYPE_STRUCTURES], "Tous");
-  fillSelect(el.contribTypeStructure, ["", ...TYPE_STRUCTURES], "Sélectionner");
-
   const secteurs = ["", ...Object.keys(SECTEUR_PUBLICS)];
   fillSelect(el.filterSecteur, secteurs, "Tous");
   fillSelect(el.contribSecteur, secteurs, "Sélectionner");
+  refreshTypeStructureSelects();
 
   setupContribPublicFilter(el.contribPublic, "");
 
@@ -709,6 +711,32 @@ function bindSearchFilters() {
   el.results.addEventListener("change", onTrackingChange);
   el.detailTrackingControls.addEventListener("change", onTrackingChange);
   el.personalView.addEventListener("click", onPersonalResultsClick);
+}
+
+function getDynamicTypeStructures() {
+  const dynamic = new Set(TYPE_STRUCTURES.map((item) => clean(item)));
+  allRecords().forEach((record) => {
+    const type = clean(record?.typeStructure);
+    if (type) dynamic.add(type);
+  });
+  const ordered = [...dynamic].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+  if (!ordered.includes("Autre")) ordered.push("Autre");
+  return ordered;
+}
+
+function refreshTypeStructureSelects() {
+  const previousFilterValue = clean(el.filterTypeStructure.value);
+  const previousContribValue = clean(el.contribTypeStructure.value);
+  const options = getDynamicTypeStructures();
+  fillSelect(el.filterTypeStructure, ["", ...options], "Tous");
+  fillSelect(el.contribTypeStructure, ["", ...options], "Sélectionner");
+
+  if (previousFilterValue && options.includes(previousFilterValue)) {
+    el.filterTypeStructure.value = previousFilterValue;
+  }
+  if (previousContribValue && options.includes(previousContribValue)) {
+    el.contribTypeStructure.value = previousContribValue;
+  }
 }
 
 function bindContributionForm() {
@@ -753,6 +781,7 @@ function bindContributionForm() {
       data.get("typeStructure") === "Autre" ? data.get("typeStructureAutre")?.toString().trim() : data.get("typeStructure");
 
     const entry = {
+      entryType: isAddContactMode ? "contact" : "experience",
       structureId: (isAddContactMode || isAddExperienceMode) ? clean(submitStructureId) : "",
       secteur: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.secteur) : clean(data.get("secteur")),
       typeStructure: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typeStructure) : clean(typeStructure),
@@ -874,14 +903,14 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
   const isAddExperience = mode === "add_experience";
 
   const get = (name) => clean(data.get(name));
-  const isTwoDigitDept = (value) => /^[0-9]{2}$/.test(value);
+  const isIdfDepartement = (value) => IDF_DEPARTEMENTS.includes(clean(value));
   const hasTypeStructure =
     get("typeStructure") && (get("typeStructure") !== "Autre" || clean(data.get("typeStructureAutre")));
 
   if (isExperience || isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
     if (!get("ville")) return "La ville est requise.";
-    if (!isTwoDigitDept(get("departement"))) return "Le département doit contenir 2 chiffres.";
+    if (!isIdfDepartement(get("departement"))) return "Sélectionnez un département d'Île-de-France.";
     if (!hasTypeStructure) return "Le type de structure est requis.";
     if (!get("secteur")) return "Le secteur est requis.";
     if (!get("typePublic")) return "Le type de public est requis.";
@@ -924,6 +953,7 @@ async function loadRemoteCsv() {
     const supabaseStructures = await loadStructuresFromSupabase();
     if (supabaseStructures && supabaseStructures.length) {
       state.remoteData = supabaseStructures;
+      refreshTypeStructureSelects();
       updateCount();
       applyInitialRoute();
       if (!el.searchView.classList.contains("hidden")) renderResults();
@@ -945,6 +975,7 @@ async function loadRemoteCsv() {
 
     state.remoteData = dataRows.map(toRecord).filter((item) => item.nomStructure);
 
+    refreshTypeStructureSelects();
     updateCount();
     applyInitialRoute();
     if (!el.searchView.classList.contains("hidden")) renderResults();
@@ -1035,6 +1066,7 @@ async function syncSharedState() {
   }
 
   if (!changed) return;
+  refreshTypeStructureSelects();
   updateCount();
   if (!el.searchView.classList.contains("hidden")) renderResults();
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
@@ -1143,6 +1175,7 @@ function mergeUniqueContributions(remoteEntries, localEntries) {
 function contributionFingerprint(entry) {
   if (!entry || typeof entry !== "object") return "";
   return normalizeForSearch([
+    clean(entry.entryType),
     clean(entry.structureId),
     clean(entry.secteur),
     clean(entry.typeStructure),
@@ -1160,6 +1193,7 @@ function contributionFingerprint(entry) {
     clean(entry.diplome),
     clean(entry.ambiance),
     clean(entry.conseils),
+    clean(entry.details),
     clean(entry.source),
   ].join("|"));
 }
@@ -1195,7 +1229,19 @@ function toRecord(cols) {
 }
 
 function allRecords() {
-  return [...state.remoteData, ...state.localContribs];
+  return [...state.remoteData, ...state.localContribs.filter((entry) => !isStructureReportEntry(entry))];
+}
+
+function isStructureReportEntry(entry) {
+  return clean(entry?.entryType) === "structure_report";
+}
+
+function isExperienceEntry(entry) {
+  if (!entry || typeof entry !== "object") return false;
+  const entryType = clean(entry.entryType);
+  if (entryType === "contact" || entryType === "structure_report") return false;
+  if (entryType === "experience") return true;
+  return Boolean(clean(entry.diplome) || clean(entry.ambiance) || clean(entry.conseils));
 }
 
 function renderResults() {
@@ -1572,6 +1618,7 @@ function renderExperiencesForStructure(structureId) {
   const group = findStructureGroupById(structureId);
   const currentBaseId = group ? makeStructureBaseId(group.primary) : "";
   const experiences = state.localContribs.filter((entry) => {
+    if (!isExperienceEntry(entry)) return false;
     if (clean(entry.structureId) === structureId) return true;
     if (makeStructureId(entry) === structureId) return true;
     if (currentBaseId && makeStructureBaseId(entry) === currentBaseId) return true;
@@ -1714,6 +1761,114 @@ async function onDetailContactsClick(event) {
   if (state.activeStructureId) openStructureDetail(state.activeStructureId);
 }
 
+async function onDetailFlagStructure() {
+  const structureId = clean(state.activeStructureId);
+  if (!structureId) return;
+  const group = findStructureGroupById(structureId);
+  if (!group) return;
+
+  const choice = window.prompt(
+    "Choisissez une action :\n1 = Signaler une erreur dans la fiche\n2 = Supprimer la structure"
+  );
+  if (choice === null) return;
+  const normalizedChoice = normalizeForSearch(choice);
+  const isDelete = normalizedChoice === "2" || normalizedChoice.includes("supprimer");
+  const isReport = normalizedChoice === "1" || normalizedChoice.includes("signaler") || normalizedChoice.includes("erreur");
+
+  if (!isDelete && !isReport) {
+    window.alert("Choix invalide. Entrez 1 ou 2.");
+    return;
+  }
+
+  if (isDelete) {
+    const confirmed = window.confirm("Voulez-vous vraiment supprimer cette structure de la base de données ?");
+    if (!confirmed) return;
+    const deleted = await deleteStructureAndRelatedData(structureId, group.primary);
+    if (!deleted) {
+      window.alert("Suppression impossible pour le moment.");
+      return;
+    }
+    window.alert("Structure supprimée.");
+    clearStructureParamInUrl();
+    showView("search");
+    renderResults();
+    return;
+  }
+
+  const details = window.prompt("Décrivez brièvement l'erreur constatée (optionnel) :", "");
+  const reportEntry = {
+    entryType: "structure_report",
+    structureId,
+    nomStructure: clean(group.primary?.nomStructure),
+    ville: clean(group.primary?.ville),
+    departement: clean(group.primary?.departement),
+    details: clean(details),
+    source: "Signalement utilisateur",
+    createdAt: new Date().toISOString(),
+  };
+  const savedRemotely = await persistContribution(reportEntry);
+  state.localContribs.unshift(reportEntry);
+  saveLocalContributions(state.localContribs);
+  window.alert(
+    savedRemotely
+      ? "Signalement enregistré."
+      : "Signalement enregistré localement uniquement."
+  );
+}
+
+function belongsToStructure(entry, structureId, structureBaseId) {
+  if (!entry || typeof entry !== "object") return false;
+  if (clean(entry.structureId) === structureId) return true;
+  if (makeStructureId(entry) === structureId) return true;
+  if (structureBaseId && makeStructureBaseId(entry) === structureBaseId) return true;
+  return false;
+}
+
+async function deleteStructureAndRelatedData(structureId, record) {
+  const structureBaseId = makeStructureBaseId(record);
+  let deletedRemotely = false;
+
+  if (supabaseClient) {
+    const { error: structuresError } = await supabaseClient.from("structures").delete().eq("structure_id", structureId);
+    if (structuresError) {
+      console.error(structuresError);
+      return false;
+    }
+    deletedRemotely = true;
+
+    const cleanupCalls = [
+      supabaseClient.from("structure_edits").delete().eq("structure_id", structureId),
+      supabaseClient.from("user_tracking").delete().eq("structure_id", structureId),
+      supabaseClient.from("contributions").delete().filter("entry->>structureId", "eq", structureId),
+    ];
+    await Promise.allSettled(cleanupCalls);
+  }
+
+  state.remoteData = state.remoteData.filter((entry) => makeStructureId(entry) !== structureId);
+  state.localContribs = state.localContribs.filter(
+    (entry) => !belongsToStructure(entry, structureId, structureBaseId)
+  );
+  delete state.structureEdits[structureId];
+
+  Object.keys(state.trackingByUser).forEach((pseudo) => {
+    if (state.trackingByUser[pseudo] && state.trackingByUser[pseudo][structureId]) {
+      delete state.trackingByUser[pseudo][structureId];
+    }
+  });
+
+  saveLocalContributions(state.localContribs);
+  saveStructureEdits(state.structureEdits);
+  saveTrackingByUser(state.trackingByUser);
+  updateCount();
+
+  if (state.activeStructureId === structureId) {
+    state.activeStructureId = null;
+  }
+  if (!el.personalView.classList.contains("hidden")) renderPersonalView();
+
+  return deletedRemotely || !supabaseClient;
+}
+
 function prefillContributionForm(record) {
   const setValue = (name, value) => {
     const input = el.contribForm.elements[name];
@@ -1757,6 +1912,7 @@ function setContributionMode(mode) {
   else if (mode === "add_contact") state.contributionMode = "add_contact";
   else if (mode === "add_experience") state.contributionMode = "add_experience";
   else state.contributionMode = "experience";
+  refreshTypeStructureSelects();
 
   const isEdit = state.contributionMode === "edit_structure";
   const isNewStructure = state.contributionMode === "new_structure";
