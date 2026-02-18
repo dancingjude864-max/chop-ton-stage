@@ -842,22 +842,34 @@ function bindContributionForm() {
 
     let savedRemotely = false;
     if (state.contributionMode === "edit_structure" && state.editingStructureId) {
+      const editPayload = {
+        secteur: entry.secteur,
+        typeStructure: entry.typeStructure,
+        association: entry.association,
+        departement: entry.departement,
+        nomStructure: entry.nomStructure,
+        ville: entry.ville,
+        typePublic: entry.typePublic,
+      };
+
       if (supabaseClient) {
         savedRemotely = await persistStructureRecord(state.editingStructureId, entry);
-        if (savedRemotely) {
-          const idx = state.remoteData.findIndex((r) => makeStructureId(r) === state.editingStructureId);
-          if (idx >= 0) state.remoteData[idx] = { ...state.remoteData[idx], ...entry, structureId: state.editingStructureId, source: "Google Sheet" };
+        const idx = state.remoteData.findIndex((r) => makeStructureId(r) === state.editingStructureId);
+        if (idx >= 0) {
+          state.remoteData[idx] = {
+            ...state.remoteData[idx],
+            ...entry,
+            structureId: state.editingStructureId,
+            source: "Google Sheet",
+          };
         }
+
+        state.structureEdits[state.editingStructureId] = editPayload;
+        const savedEditFallback = await persistStructureEdit(state.editingStructureId, editPayload);
+        saveStructureEdits(state.structureEdits);
+        if (!savedRemotely) savedRemotely = savedEditFallback;
       } else {
-        state.structureEdits[state.editingStructureId] = {
-          secteur: entry.secteur,
-          typeStructure: entry.typeStructure,
-          association: entry.association,
-          departement: entry.departement,
-          nomStructure: entry.nomStructure,
-          ville: entry.ville,
-          typePublic: entry.typePublic,
-        };
+        state.structureEdits[state.editingStructureId] = editPayload;
         savedRemotely = await persistStructureEdit(
           state.editingStructureId,
           state.structureEdits[state.editingStructureId]
