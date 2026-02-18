@@ -940,7 +940,6 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
 
   if (isExperience || isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
-    if (!get("ville")) return "La ville est requise.";
     if (!isIdfDepartement(get("departement"))) return "Sélectionnez un département d'Île-de-France.";
     if (!hasTypeStructure) return "Le type de structure est requis.";
     if (!get("secteur")) return "Le secteur est requis.";
