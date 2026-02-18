@@ -132,6 +132,7 @@ const el = {
   deleteAccountBtn: document.getElementById("deleteAccountBtn"),
   resetFilters: document.getElementById("resetFilters"),
   filterTypeStructure: document.getElementById("filterTypeStructure"),
+  filterTypeStructureList: document.getElementById("filterTypeStructureList"),
   filterSecteur: document.getElementById("filterSecteur"),
   filterPublicCategory: document.getElementById("filterPublicCategory"),
   filterLocation: document.getElementById("filterLocation"),
@@ -145,10 +146,9 @@ const el = {
   contribStageDetails: document.getElementById("contribStageDetails"),
   contribSubmitBtn: document.getElementById("contribSubmitBtn"),
   contribTypeStructure: document.getElementById("contribTypeStructure"),
+  contribTypeStructureList: document.getElementById("contribTypeStructureList"),
   contribSecteur: document.getElementById("contribSecteur"),
   contribPublic: document.getElementById("contribPublic"),
-  otherTypeWrap: document.getElementById("otherTypeWrap"),
-  otherTypeInput: document.getElementById("otherTypeInput"),
   dureeHint: document.getElementById("dureeHint"),
 };
 
@@ -186,8 +186,6 @@ function bindNavigation() {
     state.contributionMode = "new_structure";
     setContributionMode("new_structure");
     el.contribForm.reset();
-    el.otherTypeWrap.classList.add("hidden");
-    el.otherTypeInput.required = false;
     setupContribPublicFilter(el.contribPublic, "");
     showView("contrib");
     el.contribStatus.textContent = "Renseignez les informations de la structure puis enregistrez.";
@@ -696,18 +694,16 @@ function setupStaticSelects() {
   const secteurs = ["", ...Object.keys(SECTEUR_PUBLICS)];
   fillSelect(el.filterSecteur, secteurs, "Tous");
   fillSelect(el.contribSecteur, secteurs, "Sélectionner");
-  refreshTypeStructureSelects();
+  refreshTypeStructureSuggestions();
 
   setupContribPublicFilter(el.contribPublic, "");
 
-  el.contribTypeStructure.addEventListener("change", () => {
-    const isOther = el.contribTypeStructure.value === "Autre";
-    el.otherTypeWrap.classList.toggle("hidden", !isOther);
-    el.otherTypeInput.required = isOther;
-  });
-
   el.contribSecteur.addEventListener("change", () => {
     setupContribPublicFilter(el.contribPublic, el.contribSecteur.value);
+  });
+
+  el.contribTypeStructure.addEventListener("input", () => {
+    refreshTypeStructureSuggestions();
   });
 
   [...el.contribForm.querySelectorAll('input[name="gratification"]')].forEach((radio) => {
@@ -716,7 +712,10 @@ function setupStaticSelects() {
 }
 
 function bindSearchFilters() {
-  el.filterTypeStructure.addEventListener("change", renderResults);
+  el.filterTypeStructure.addEventListener("input", () => {
+    refreshTypeStructureSuggestions();
+    renderResults();
+  });
   el.filterSecteur.addEventListener("change", renderResults);
   el.filterPublicCategory.addEventListener("change", renderResults);
   el.filterLocation.addEventListener("input", renderResults);
@@ -733,24 +732,46 @@ function getDynamicTypeStructures() {
     const type = clean(record?.typeStructure);
     if (type) dynamic.add(type);
   });
-  const ordered = [...dynamic].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
-  if (!ordered.includes("Autre")) ordered.push("Autre");
-  return ordered;
+  return [...dynamic]
+    .map(clean)
+    .filter((value) => value && normalizeForSearch(value) !== "autre")
+    .sort((a, b) => a.localeCompare(b, "fr"));
 }
 
-function refreshTypeStructureSelects() {
+function refreshTypeStructureSuggestions() {
   const previousFilterValue = clean(el.filterTypeStructure.value);
   const previousContribValue = clean(el.contribTypeStructure.value);
-  const options = getDynamicTypeStructures();
-  fillSelect(el.filterTypeStructure, ["", ...options], "Tous");
-  fillSelect(el.contribTypeStructure, ["", ...options], "Sélectionner");
+  const filterSuggestions = getTypeStructureSuggestions(previousFilterValue, 20);
+  const contribSuggestions = getTypeStructureSuggestions(previousContribValue, 20);
+  setDatalistOptions(el.filterTypeStructureList, filterSuggestions);
+  setDatalistOptions(el.contribTypeStructureList, contribSuggestions);
+}
 
-  if (previousFilterValue && options.includes(previousFilterValue)) {
-    el.filterTypeStructure.value = previousFilterValue;
-  }
-  if (previousContribValue && options.includes(previousContribValue)) {
-    el.contribTypeStructure.value = previousContribValue;
-  }
+function getTypeStructureSuggestions(query, limit = 20) {
+  const normalizedQuery = normalizeForSearch(query);
+  const options = getDynamicTypeStructures();
+  const scored = options
+    .map((option) => ({ option, score: scoreTypeStructureOption(option, normalizedQuery) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.option.localeCompare(b.option, "fr"));
+  return scored.slice(0, limit).map((item) => item.option);
+}
+
+function scoreTypeStructureOption(option, normalizedQuery) {
+  const normalizedOption = normalizeForSearch(option);
+  if (!normalizedQuery) return 1;
+  if (normalizedOption === normalizedQuery) return 100;
+  if (normalizedOption.startsWith(normalizedQuery)) return 80;
+  if (normalizedOption.includes(normalizedQuery)) return 60;
+  const words = normalizedOption.split(/[\s/'-]+/).filter(Boolean);
+  if (words.some((word) => word.startsWith(normalizedQuery))) return 40;
+  return 0;
+}
+
+function setDatalistOptions(datalistEl, options) {
+  datalistEl.innerHTML = options
+    .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+    .join("");
 }
 
 function bindContributionForm() {
@@ -791,8 +812,7 @@ function bindContributionForm() {
       el.contribStatus.className = "text-sm text-red-700";
       return;
     }
-    const typeStructure =
-      data.get("typeStructure") === "Autre" ? data.get("typeStructureAutre")?.toString().trim() : data.get("typeStructure");
+    const typeStructure = clean(data.get("typeStructure"));
 
     const entry = {
       entryType: isAddContactMode ? "contact" : "experience",
@@ -860,8 +880,6 @@ function bindContributionForm() {
     }
 
     el.contribForm.reset();
-    el.otherTypeWrap.classList.add("hidden");
-    el.otherTypeInput.required = false;
     setupContribPublicFilter(el.contribPublic, "");
 
     if (state.contributionMode === "edit_structure") {
@@ -918,8 +936,7 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
 
   const get = (name) => clean(data.get(name));
   const isIdfDepartement = (value) => IDF_DEPARTEMENTS.includes(clean(value));
-  const hasTypeStructure =
-    get("typeStructure") && (get("typeStructure") !== "Autre" || clean(data.get("typeStructureAutre")));
+  const hasTypeStructure = get("typeStructure");
 
   if (isExperience || isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
@@ -967,7 +984,7 @@ async function loadRemoteCsv() {
     const supabaseStructures = await loadStructuresFromSupabase();
     if (supabaseStructures && supabaseStructures.length) {
       state.remoteData = supabaseStructures;
-      refreshTypeStructureSelects();
+      refreshTypeStructureSuggestions();
       updateCount();
       applyInitialRoute();
       if (!el.searchView.classList.contains("hidden")) renderResults();
@@ -989,7 +1006,7 @@ async function loadRemoteCsv() {
 
     state.remoteData = dataRows.map(toRecord).filter((item) => item.nomStructure);
 
-    refreshTypeStructureSelects();
+    refreshTypeStructureSuggestions();
     updateCount();
     applyInitialRoute();
     if (!el.searchView.classList.contains("hidden")) renderResults();
@@ -1080,7 +1097,7 @@ async function syncSharedState() {
   }
 
   if (!changed) return;
-  refreshTypeStructureSelects();
+  refreshTypeStructureSuggestions();
   updateCount();
   if (!el.searchView.classList.contains("hidden")) renderResults();
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
@@ -1274,7 +1291,7 @@ function renderResults() {
     const itemVille = clean(item?.ville);
     const itemDept = clean(item?.departement);
 
-    const passType = !typeStructure || itemType === typeStructure;
+    const passType = !typeStructure || normalizeForSearch(itemType).includes(normalizeForSearch(typeStructure));
     const passSecteur = !secteur || itemSecteur === secteur;
     const itemPublicCategories = classifyPublicCategories(itemPublic);
     const passPublic =
@@ -1900,15 +1917,7 @@ function prefillContributionForm(record) {
   setValue("ville", record.ville);
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
-
-  if (TYPE_STRUCTURES.includes(record.typeStructure)) {
-    setValue("typeStructure", record.typeStructure);
-  } else {
-    setValue("typeStructure", "");
-  }
-  el.otherTypeWrap.classList.add("hidden");
-  el.otherTypeInput.required = false;
-  setValue("typeStructureAutre", "");
+  setValue("typeStructure", record.typeStructure);
 
   setupContribPublicFilter(el.contribPublic, record.secteur);
   const publicOptionExists = [...el.contribPublic.options].some((opt) => opt.value === record.typePublic);
@@ -1931,7 +1940,7 @@ function setContributionMode(mode) {
   else if (mode === "add_contact") state.contributionMode = "add_contact";
   else if (mode === "add_experience") state.contributionMode = "add_experience";
   else state.contributionMode = "experience";
-  refreshTypeStructureSelects();
+  refreshTypeStructureSuggestions();
 
   const isEdit = state.contributionMode === "edit_structure";
   const isNewStructure = state.contributionMode === "new_structure";
@@ -1958,7 +1967,6 @@ function setContributionMode(mode) {
     "ville",
     "departement",
     "typeStructure",
-    "typeStructureAutre",
     "secteur",
     "typePublic",
   ];

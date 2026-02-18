@@ -114,9 +114,14 @@
         <div class="grid gap-4 rounded-2xl border border-indigo-300/35 bg-slate-950/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <label class="block text-sm">
             <span class="mb-1 block font-semibold text-slate-700">Cherchez par type de structure</span>
-            <select id="filterTypeStructure" class="w-full rounded-lg border border-slate-300 px-3 py-2">
-              <option value="">Tous</option>
-            </select>
+            <input
+              id="filterTypeStructure"
+              type="text"
+              list="filterTypeStructureList"
+              placeholder="Rechercher un type de structure"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+            <datalist id="filterTypeStructureList"></datalist>
           </label>
 
           <label class="block text-sm">
@@ -363,11 +368,16 @@
               </label>
 
               <label class="text-sm font-medium">Type de structure *
-                <select required id="contribTypeStructure" name="typeStructure" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></select>
-              </label>
-
-              <label id="otherTypeWrap" class="hidden text-sm font-medium">Précisez le type de structure *
-                <input id="otherTypeInput" name="typeStructureAutre" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input
+                  required
+                  id="contribTypeStructure"
+                  name="typeStructure"
+                  type="text"
+                  list="contribTypeStructureList"
+                  placeholder="Tapez pour chercher ou ajoutez un nouveau type"
+                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                />
+                <datalist id="contribTypeStructureList"></datalist>
               </label>
 
               <label class="text-sm font-medium">Secteur d'intervention *
