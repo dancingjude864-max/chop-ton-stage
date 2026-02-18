@@ -106,6 +106,7 @@ const el = {
   detailName: document.getElementById("detailName"),
   detailAssociation: document.getElementById("detailAssociation"),
   detailBadges: document.getElementById("detailBadges"),
+  detailStructureNote: document.getElementById("detailStructureNote"),
   detailMeta: document.getElementById("detailMeta"),
   detailTexts: document.getElementById("detailTexts"),
   detailTrackingControls: document.getElementById("detailTrackingControls"),
@@ -832,6 +833,7 @@ function bindContributionForm() {
         (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement"))
       ),
       typePublic: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typePublic) : clean(data.get("typePublic")),
+      structureNotes: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.structureNotes) : clean(data.get("structureNotes")),
       duree: isAddContactMode ? clean(baseRecord?.duree) : clean(data.get("duree")),
       diplome: isAddContactMode ? clean(baseRecord?.diplome) : clean(data.get("diplome")),
       missions: isAddContactMode ? clean(baseRecord?.missions) : "",
@@ -850,6 +852,7 @@ function bindContributionForm() {
         nomStructure: entry.nomStructure,
         ville: entry.ville,
         typePublic: entry.typePublic,
+        structureNotes: entry.structureNotes,
       };
 
       if (supabaseClient) {
@@ -881,6 +884,9 @@ function bindContributionForm() {
       const structureRecord = { ...entry, structureId, source: "Google Sheet" };
       if (supabaseClient) {
         savedRemotely = await persistStructureRecord(structureId, structureRecord);
+        if (clean(structureRecord.structureNotes)) {
+          await persistStructureEdit(structureId, { structureNotes: structureRecord.structureNotes });
+        }
       } else {
         savedRemotely = false;
       }
@@ -1234,6 +1240,7 @@ function contributionFingerprint(entry) {
     clean(entry.gratification),
     clean(entry.ville),
     clean(entry.typePublic),
+    clean(entry.structureNotes),
     clean(entry.duree),
     clean(entry.diplome),
     clean(entry.ambiance),
@@ -1361,6 +1368,7 @@ function renderCard(item) {
           <p><span class="font-semibold">Localisation:</span> ${escapeHtml(structure.ville || "-")} (${escapeHtml(structure.departement || "-")})</p>
           <p><span class="font-semibold">Gratification:</span> ${escapeHtml(structure.gratification || "-")}</p>
           <p><span class="font-semibold">Contacts:</span> ${escapeHtml(item.contactAvailability)}</p>
+          ${structure.structureNotes ? `<p><span class="font-semibold">Note:</span> ${escapeHtml(truncateText(structure.structureNotes, 160))}</p>` : ""}
         </div>
       </div>
 
@@ -1516,6 +1524,12 @@ function clean(value) {
   return (value || "").toString().trim();
 }
 
+function truncateText(value, maxLength = 160) {
+  const text = clean(value);
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
 function normalizeVilleByDepartement(ville, departement) {
   const dep = clean(departement);
   if (dep === "75") return "Paris";
@@ -1536,6 +1550,7 @@ function searchableRecordText(item) {
     item.gratification,
     item.ville,
     item.typePublic,
+    item.structureNotes,
     item.duree,
     item.diplome,
     item.missions,
@@ -1619,6 +1634,8 @@ function openStructureDetail(structureId) {
     el.detailName.textContent = "Structure introuvable";
     el.detailAssociation.textContent = "Cette structure n'a pas été trouvée.";
     el.detailBadges.innerHTML = "";
+    el.detailStructureNote.innerHTML = "";
+    el.detailStructureNote.classList.add("hidden");
     el.detailMeta.innerHTML = "";
     el.detailTexts.innerHTML = "";
     el.detailTrackingControls.innerHTML = "";
@@ -1640,6 +1657,16 @@ function openStructureDetail(structureId) {
   el.detailName.textContent = record.nomStructure;
   el.detailAssociation.textContent = record.association || "Association/Fondation non renseignée";
   el.detailBadges.innerHTML = badges;
+  if (clean(record.structureNotes)) {
+    el.detailStructureNote.innerHTML = `
+      <p class="text-xs font-semibold uppercase tracking-wide text-violet-200">Note sur la structure</p>
+      <p class="mt-1 whitespace-pre-line text-sm text-violet-50">${escapeHtml(record.structureNotes)}</p>
+    `;
+    el.detailStructureNote.classList.remove("hidden");
+  } else {
+    el.detailStructureNote.innerHTML = "";
+    el.detailStructureNote.classList.add("hidden");
+  }
   el.detailMeta.innerHTML = `
     <div>
       <p><span class="font-semibold">Localisation:</span> ${escapeHtml(record.ville || "-")} (${escapeHtml(record.departement || "-")})</p>
@@ -1933,6 +1960,7 @@ function prefillContributionForm(record) {
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
   setValue("typeStructure", record.typeStructure);
+  setValue("structureNotes", record.structureNotes);
 
   setupContribPublicFilter(el.contribPublic, record.secteur);
   ensureSelectOptionExists(el.contribPublic, record.typePublic, record.typePublic);
@@ -1995,6 +2023,7 @@ function setContributionMode(mode) {
     "typeStructure",
     "secteur",
     "typePublic",
+    "structureNotes",
   ];
   structureFieldNames.forEach((name) => {
     const fields = [...el.contribForm.querySelectorAll(`[name="${name}"]`)];
