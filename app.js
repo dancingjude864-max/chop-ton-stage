@@ -948,11 +948,14 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
 
   const get = (name) => clean(data.get(name));
   const isIdfDepartement = (value) => IDF_DEPARTEMENTS.includes(clean(value));
+  const isTwoDigitDept = (value) => /^[0-9]{2}$/.test(clean(value));
   const hasTypeStructure = get("typeStructure");
 
   if (isExperience || isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
-    if (!isIdfDepartement(get("departement"))) return "Sélectionnez un département d'Île-de-France.";
+    const departement = get("departement");
+    const validDepartement = isIdfDepartement(departement) || (isEdit && isTwoDigitDept(departement));
+    if (!validDepartement) return "Sélectionnez un département valide.";
     if (!hasTypeStructure) return "Le type de structure est requis.";
     if (!get("secteur")) return "Le secteur est requis.";
     if (!get("typePublic")) return "Le type de public est requis.";
@@ -1926,13 +1929,14 @@ function prefillContributionForm(record) {
   setValue("nomStructure", record.nomStructure);
   setValue("association", record.association);
   setValue("ville", record.ville);
+  ensureSelectOptionExists(el.contribForm.elements.departement, record.departement, `${record.departement} - Hors IDF`);
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
   setValue("typeStructure", record.typeStructure);
 
   setupContribPublicFilter(el.contribPublic, record.secteur);
-  const publicOptionExists = [...el.contribPublic.options].some((opt) => opt.value === record.typePublic);
-  setValue("typePublic", publicOptionExists ? record.typePublic : "");
+  ensureSelectOptionExists(el.contribPublic, record.typePublic, record.typePublic);
+  setValue("typePublic", record.typePublic);
 
   if (state.contributionMode === "edit_structure" || state.contributionMode === "add_contact") {
     setValue("diplome", "");
@@ -1943,6 +1947,17 @@ function prefillContributionForm(record) {
     if (checkedRadio) checkedRadio.checked = false;
   }
   updateDurationFieldState();
+}
+
+function ensureSelectOptionExists(selectEl, value, label) {
+  const v = clean(value);
+  if (!selectEl || !v) return;
+  const exists = [...selectEl.options].some((opt) => clean(opt.value) === v);
+  if (exists) return;
+  const opt = document.createElement("option");
+  opt.value = v;
+  opt.textContent = clean(label) || v;
+  selectEl.appendChild(opt);
 }
 
 function setContributionMode(mode) {
