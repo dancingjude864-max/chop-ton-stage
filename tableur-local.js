@@ -75,7 +75,9 @@ async function loadRows() {
     const localRows = (sharedContribs || loadLocalContributions()).map(toLocalTableRow);
     const edits = sharedEdits || loadStructureEdits();
 
-    const merged = [...remoteRows, ...localRows].map((row) => applyStructureEdit(row, edits));
+    const merged = [...remoteRows, ...localRows]
+      .map((row) => applyStructureEdit(row, edits))
+      .filter((row) => !isDeletedRow(row, edits));
     state.rows = aggregateRowsByStructure(merged);
     renderRows();
   } catch (error) {
@@ -313,6 +315,13 @@ function applyStructureEdit(row, edits) {
   updated[10] = clean(edit.ville) || updated[10];
   updated[11] = clean(edit.typePublic) || updated[11];
   return updated;
+}
+
+function isDeletedRow(row, edits) {
+  const id = clean(row[15]) || makeStructureIdFromRow(row);
+  const edit = edits && typeof edits === "object" ? edits[id] : null;
+  if (!edit || typeof edit !== "object") return false;
+  return edit.deleted === true || clean(edit.deleted) === "true";
 }
 
 function makeStructureIdFromRow(row) {

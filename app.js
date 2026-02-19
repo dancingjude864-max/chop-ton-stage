@@ -1729,6 +1729,7 @@ function getStructureGroups() {
   return [...map.values()].map((group) => {
     const rawPrimary = pickPrimaryRecord(group.records);
     const edit = state.structureEdits[group.id] || null;
+    if (isStructureDeleted(edit)) return null;
     const primary = edit ? { ...rawPrimary, ...edit } : rawPrimary;
     const contacts = extractContacts(group.records, edit);
     return {
@@ -1742,7 +1743,12 @@ function getStructureGroups() {
         : "Google Sheet",
       contactAvailability: getContactAvailabilityLabel(contacts),
     };
-  });
+  }).filter(Boolean);
+}
+
+function isStructureDeleted(edit) {
+  if (!edit || typeof edit !== "object") return false;
+  return edit.deleted === true || clean(edit.deleted) === "true";
 }
 
 function pickPrimaryRecord(records) {
@@ -1921,11 +1927,19 @@ async function deleteStructureAndRelatedData(structureId, record) {
     await Promise.allSettled(cleanupCalls);
   }
 
+  const deleteMarker = {
+    deleted: true,
+    nomStructure: clean(record?.nomStructure),
+    departement: clean(record?.departement),
+    ville: clean(record?.ville),
+  };
+  state.structureEdits[structureId] = deleteMarker;
+  const markerPersisted = await persistStructureEdit(structureId, deleteMarker);
+
   state.remoteData = state.remoteData.filter((entry) => makeStructureId(entry) !== structureId);
   state.localContribs = state.localContribs.filter(
     (entry) => !belongsToStructure(entry, structureId, structureBaseId)
   );
-  delete state.structureEdits[structureId];
 
   Object.keys(state.trackingByUser).forEach((pseudo) => {
     if (state.trackingByUser[pseudo] && state.trackingByUser[pseudo][structureId]) {
@@ -1943,7 +1957,7 @@ async function deleteStructureAndRelatedData(structureId, record) {
   }
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
 
-  return deletedRemotely || !supabaseClient;
+  return deletedRemotely || markerPersisted || !supabaseClient;
 }
 
 function prefillContributionForm(record) {
