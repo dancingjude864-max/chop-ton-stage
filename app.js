@@ -739,18 +739,20 @@ function setupStaticSelects() {
 }
 
 function bindSearchFilters() {
+  const debouncedRender = debounce(renderResults, 180);
+
   el.filterTypeStructure.addEventListener("input", () => {
     refreshTypeStructureSuggestions();
-    renderResults();
+    debouncedRender();
   });
   el.filterAssociation.addEventListener("input", () => {
     refreshAssociationSuggestions();
-    renderResults();
+    debouncedRender();
   });
   el.filterSecteur.addEventListener("change", renderResults);
   el.filterPublicCategory.addEventListener("change", renderResults);
-  el.filterLocation.addEventListener("input", renderResults);
-  el.filterKeyword.addEventListener("input", renderResults);
+  el.filterLocation.addEventListener("input", debouncedRender);
+  el.filterKeyword.addEventListener("input", debouncedRender);
   el.results.addEventListener("click", onResultsClick);
   el.results.addEventListener("change", onTrackingChange);
   el.detailTrackingControls.addEventListener("change", onTrackingChange);
@@ -823,6 +825,14 @@ function setDatalistOptions(datalistEl, options) {
   datalistEl.innerHTML = options
     .map((value) => `<option value="${escapeHtml(value)}"></option>`)
     .join("");
+}
+
+function debounce(fn, delay = 150) {
+  let timerId = null;
+  return (...args) => {
+    if (timerId) clearTimeout(timerId);
+    timerId = setTimeout(() => fn(...args), delay);
+  };
 }
 
 function bindContributionForm() {
