@@ -54,7 +54,7 @@
       Tableur
     </button>
 
-    <header class="mx-auto max-w-6xl px-4 pt-12 pb-4 sm:px-6">
+    <header class="mx-auto max-w-6xl px-4 pt-24 pb-2 sm:px-6">
       <div class="mb-4 flex justify-end gap-2">
         <button id="goPersonal" class="rounded-lg border border-indigo-400/40 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 hover:bg-slate-800">
           Mon espace
@@ -72,7 +72,7 @@
     </header>
 
     <main class="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
-      <section id="homeView" class="mx-auto flex min-h-[56vh] max-w-5xl flex-col justify-center p-2 sm:p-4">
+      <section id="homeView" class="mx-auto flex min-h-[44vh] max-w-5xl flex-col justify-center p-2 sm:p-4">
         <div class="grid w-full gap-4 md:grid-cols-3">
           <button
             id="goSearch"
@@ -102,13 +102,23 @@
       </section>
 
       <section id="searchView" class="panel hidden rounded-3xl border border-indigo-300/35 bg-slate-800/50 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
-        <div class="mb-5 flex flex-wrap gap-2">
-          <button id="backFromSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
-            Retour accueil
-          </button>
-          <button id="resetFilters" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
-            Réinitialiser filtres
-          </button>
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap gap-2">
+            <button id="searchGoPersonal" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+              Mon espace
+            </button>
+            <button id="searchGoAccount" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+              Compte
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="backFromSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+              Retour accueil
+            </button>
+            <button id="resetFilters" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+              Réinitialiser filtres
+            </button>
+          </div>
         </div>
 
         <div class="grid gap-4 rounded-2xl border border-indigo-300/35 bg-slate-950/45 p-4 sm:grid-cols-2 lg:grid-cols-5">
