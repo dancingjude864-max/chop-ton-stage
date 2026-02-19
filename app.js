@@ -1349,6 +1349,7 @@ function renderResults() {
 function renderCard(item) {
   const structure = item.primary;
   const hasConcern = Boolean(clean(structure.structureAlert));
+  const effectiveGratification = getEffectiveStructureGratification(item.id, structure);
   const tags = [
     badge(structure.typeStructure, "bg-cyan-500/20 text-cyan-200"),
     badge(structure.secteur, "bg-violet-500/20 text-violet-200"),
@@ -1375,7 +1376,7 @@ function renderCard(item) {
       <div class="mt-4 grid gap-4 text-sm">
         <div>
           <p><span class="font-semibold">Localisation:</span> ${escapeHtml(structure.ville || "-")} (${escapeHtml(structure.departement || "-")})</p>
-          <p><span class="font-semibold">Gratification:</span> ${escapeHtml(structure.gratification || "-")}</p>
+          <p><span class="font-semibold">Gratification:</span> ${escapeHtml(effectiveGratification || "-")}</p>
           <p><span class="font-semibold">Contacts:</span> ${escapeHtml(item.contactAvailability)}</p>
           ${structure.structureNotes ? `<p><span class="font-semibold">Note:</span> ${escapeHtml(truncateText(structure.structureNotes, 160))}</p>` : ""}
         </div>
@@ -1637,6 +1638,7 @@ function applyInitialRoute() {
 function openStructureDetail(structureId) {
   const group = findStructureGroupById(structureId);
   const record = group?.primary || null;
+  const effectiveGratification = getEffectiveStructureGratification(structureId, record);
   state.activeStructureId = structureId;
   showView("detail");
 
@@ -1692,8 +1694,7 @@ function openStructureDetail(structureId) {
   el.detailMeta.innerHTML = `
     <div>
       <p><span class="font-semibold">Localisation:</span> ${escapeHtml(record.ville || "-")} (${escapeHtml(record.departement || "-")})</p>
-      <p><span class="font-semibold">Gratification:</span> ${escapeHtml(record.gratification || "-")}</p>
-      <p><span class="font-semibold">Durée:</span> ${escapeHtml(record.duree || "-")} semaine(s)</p>
+      <p><span class="font-semibold">Gratification:</span> ${escapeHtml(effectiveGratification || "-")}</p>
     </div>
     <div></div>
   `;
@@ -1709,15 +1710,7 @@ function openStructureDetail(structureId) {
 }
 
 function renderExperiencesForStructure(structureId) {
-  const group = findStructureGroupById(structureId);
-  const currentBaseId = group ? makeStructureBaseId(group.primary) : "";
-  const experiences = state.localContribs.filter((entry) => {
-    if (!isExperienceEntry(entry)) return false;
-    if (clean(entry.structureId) === structureId) return true;
-    if (makeStructureId(entry) === structureId) return true;
-    if (currentBaseId && makeStructureBaseId(entry) === currentBaseId) return true;
-    return false;
-  });
+  const experiences = getExperiencesForStructure(structureId);
   if (!experiences.length) {
     el.detailExperiences.innerHTML =
       '<div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Aucune expérience étudiante ajoutée pour le moment.</div>';
@@ -1738,6 +1731,32 @@ function renderExperiencesForStructure(structureId) {
     `
     )
     .join("");
+}
+
+function getExperiencesForStructure(structureId) {
+  const group = findStructureGroupById(structureId);
+  const currentBaseId = group ? makeStructureBaseId(group.primary) : "";
+  return state.localContribs.filter((entry) => {
+    if (!isExperienceEntry(entry)) return false;
+    if (clean(entry.structureId) === structureId) return true;
+    if (makeStructureId(entry) === structureId) return true;
+    if (currentBaseId && makeStructureBaseId(entry) === currentBaseId) return true;
+    return false;
+  });
+}
+
+function getEffectiveStructureGratification(structureId, record) {
+  const experiences = getExperiencesForStructure(structureId);
+  if (!experiences.length) return clean(record?.gratification);
+
+  const normalized = experiences
+    .map((exp) => normalizeForSearch(exp?.gratification))
+    .filter(Boolean);
+
+  if (normalized.includes("oui")) return "Oui";
+  if (normalized.includes("non")) return "Non";
+  if (normalized.includes("alternance")) return "Alternance";
+  return clean(record?.gratification);
 }
 
 function getStructureGroups() {
