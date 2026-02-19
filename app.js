@@ -1634,8 +1634,11 @@ function openStructureDetail(structureId) {
     el.detailName.textContent = "Structure introuvable";
     el.detailAssociation.textContent = "Cette structure n'a pas été trouvée.";
     el.detailBadges.innerHTML = "";
-    el.detailStructureNote.innerHTML = "";
-    el.detailStructureNote.classList.add("hidden");
+    el.detailStructureNote.innerHTML = `
+      <p class="text-xs font-semibold uppercase tracking-wide text-violet-200">Note sur la structure</p>
+      <p class="mt-1 whitespace-pre-line text-sm text-violet-50">Aucune note collaborative pour le moment.</p>
+    `;
+    el.detailStructureNote.classList.remove("hidden");
     el.detailMeta.innerHTML = "";
     el.detailTexts.innerHTML = "";
     el.detailTrackingControls.innerHTML = "";
@@ -1657,16 +1660,14 @@ function openStructureDetail(structureId) {
   el.detailName.textContent = record.nomStructure;
   el.detailAssociation.textContent = record.association || "Association/Fondation non renseignée";
   el.detailBadges.innerHTML = badges;
-  if (clean(record.structureNotes)) {
-    el.detailStructureNote.innerHTML = `
-      <p class="text-xs font-semibold uppercase tracking-wide text-violet-200">Note sur la structure</p>
-      <p class="mt-1 whitespace-pre-line text-sm text-violet-50">${escapeHtml(record.structureNotes)}</p>
-    `;
-    el.detailStructureNote.classList.remove("hidden");
-  } else {
-    el.detailStructureNote.innerHTML = "";
-    el.detailStructureNote.classList.add("hidden");
-  }
+  const noteText = clean(record.structureNotes)
+    ? escapeHtml(record.structureNotes)
+    : "Aucune note collaborative pour le moment.";
+  el.detailStructureNote.innerHTML = `
+    <p class="text-xs font-semibold uppercase tracking-wide text-violet-200">Note sur la structure</p>
+    <p class="mt-1 whitespace-pre-line text-sm text-violet-50">${noteText}</p>
+  `;
+  el.detailStructureNote.classList.remove("hidden");
   el.detailMeta.innerHTML = `
     <div>
       <p><span class="font-semibold">Localisation:</span> ${escapeHtml(record.ville || "-")} (${escapeHtml(record.departement || "-")})</p>
