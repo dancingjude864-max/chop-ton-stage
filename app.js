@@ -102,6 +102,7 @@ const el = {
   detailFlagStructure: document.getElementById("detailFlagStructure"),
   detailFlagMenu: document.getElementById("detailFlagMenu"),
   detailReportErrorBtn: document.getElementById("detailReportErrorBtn"),
+  detailReportConcernBtn: document.getElementById("detailReportConcernBtn"),
   detailDeleteStructureBtn: document.getElementById("detailDeleteStructureBtn"),
   detailName: document.getElementById("detailName"),
   detailAssociation: document.getElementById("detailAssociation"),
@@ -287,6 +288,7 @@ function bindNavigation() {
     toggleFlagMenu();
   });
   el.detailReportErrorBtn.addEventListener("click", onReportStructureError);
+  el.detailReportConcernBtn.addEventListener("click", onReportStructureConcern);
   el.detailDeleteStructureBtn.addEventListener("click", onDeleteStructureFromDetail);
   document.addEventListener("click", (event) => {
     const insideMenu = event.target.closest("#detailFlagMenu");
@@ -844,7 +846,13 @@ function bindContributionForm() {
 
     let savedRemotely = false;
     if (state.contributionMode === "edit_structure" && state.editingStructureId) {
+      const previousEdit =
+        state.structureEdits[state.editingStructureId] &&
+        typeof state.structureEdits[state.editingStructureId] === "object"
+          ? state.structureEdits[state.editingStructureId]
+          : {};
       const editPayload = {
+        ...previousEdit,
         secteur: entry.secteur,
         typeStructure: entry.typeStructure,
         association: entry.association,
@@ -1340,6 +1348,7 @@ function renderResults() {
 
 function renderCard(item) {
   const structure = item.primary;
+  const hasConcern = Boolean(clean(structure.structureAlert));
   const tags = [
     badge(structure.typeStructure, "bg-cyan-500/20 text-cyan-200"),
     badge(structure.secteur, "bg-violet-500/20 text-violet-200"),
@@ -1352,7 +1361,7 @@ function renderCard(item) {
   return `
     <article
       data-structure-id="${escapeHtml(item.id)}"
-      class="structure-card rounded-2xl border border-indigo-300/55 bg-slate-950/80 p-4 shadow-lg shadow-indigo-950/40 transition hover:border-fuchsia-300/70 hover:shadow-indigo-900/50 cursor-pointer"
+      class="structure-card rounded-2xl border ${hasConcern ? "border-red-400/80" : "border-indigo-300/55"} bg-slate-950/80 p-4 shadow-lg ${hasConcern ? "shadow-red-950/35 hover:border-red-300/90" : "shadow-indigo-950/40 hover:border-fuchsia-300/70"} transition hover:shadow-indigo-900/50 cursor-pointer"
     >
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
@@ -1551,6 +1560,7 @@ function searchableRecordText(item) {
     item.ville,
     item.typePublic,
     item.structureNotes,
+    item.structureAlert,
     item.duree,
     item.diplome,
     item.missions,
@@ -1660,12 +1670,23 @@ function openStructureDetail(structureId) {
   el.detailName.textContent = record.nomStructure;
   el.detailAssociation.textContent = record.association || "Association/Fondation non renseignée";
   el.detailBadges.innerHTML = badges;
-  const noteText = clean(record.structureNotes)
-    ? escapeHtml(record.structureNotes)
-    : "Aucune note collaborative pour le moment.";
+  const structureNotes = clean(record.structureNotes);
+  const structureAlert = clean(record.structureAlert);
+  const noteParts = [];
+  if (structureNotes) {
+    noteParts.push(`<p class="mt-1 whitespace-pre-line text-sm text-violet-50">${escapeHtml(structureNotes)}</p>`);
+  }
+  if (structureAlert) {
+    noteParts.push(
+      `<p class="mt-2 whitespace-pre-line text-sm font-semibold text-amber-200">⚠️ ${escapeHtml(structureAlert)} ⚠️</p>`
+    );
+  }
+  if (!noteParts.length) {
+    noteParts.push(`<p class="mt-1 whitespace-pre-line text-sm text-violet-50">Aucune note collaborative pour le moment.</p>`);
+  }
   el.detailStructureNote.innerHTML = `
     <p class="text-xs font-semibold uppercase tracking-wide text-violet-200">Note sur la structure</p>
-    <p class="mt-1 whitespace-pre-line text-sm text-violet-50">${noteText}</p>
+    ${noteParts.join("")}
   `;
   el.detailStructureNote.classList.remove("hidden");
   el.detailMeta.innerHTML = `
@@ -1880,6 +1901,37 @@ async function onReportStructureError() {
   );
 }
 
+async function onReportStructureConcern() {
+  closeFlagMenu();
+  const structureId = clean(state.activeStructureId);
+  if (!structureId) return;
+  const group = findStructureGroupById(structureId);
+  if (!group) return;
+
+  const details = clean(
+    window.prompt(
+      "Décrivez le problème observé (bien-être des usagers ou accueil des stagiaires) :",
+      ""
+    )
+  );
+  if (!details) return;
+
+  const existingEdit = (state.structureEdits[structureId] && typeof state.structureEdits[structureId] === "object")
+    ? state.structureEdits[structureId]
+    : {};
+  const existingAlert = clean(existingEdit.structureAlert || group.primary?.structureAlert);
+  const mergedAlert = existingAlert ? `${existingAlert}\n\n${details}` : details;
+  const payload = { ...existingEdit, structureAlert: mergedAlert };
+
+  const savedRemotely = await persistStructureEdit(structureId, payload);
+  state.structureEdits[structureId] = payload;
+  saveStructureEdits(state.structureEdits);
+  if (!el.searchView.classList.contains("hidden")) renderResults();
+  if (state.activeStructureId) openStructureDetail(state.activeStructureId);
+
+  window.alert(savedRemotely ? "Signalement enregistré." : "Signalement enregistré localement uniquement.");
+}
+
 async function onDeleteStructureFromDetail() {
   closeFlagMenu();
   const structureId = clean(state.activeStructureId);
@@ -1933,6 +1985,8 @@ async function deleteStructureAndRelatedData(structureId, record) {
     nomStructure: clean(record?.nomStructure),
     departement: clean(record?.departement),
     ville: clean(record?.ville),
+    structureAlert: clean(record?.structureAlert),
+    structureNotes: clean(record?.structureNotes),
   };
   state.structureEdits[structureId] = deleteMarker;
   const markerPersisted = await persistStructureEdit(structureId, deleteMarker);
