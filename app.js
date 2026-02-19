@@ -74,6 +74,7 @@ const state = {
   contributionMode: "experience",
   editingStructureId: null,
   pendingConcernStructureId: null,
+  editingContactContributionId: null,
 };
 
 const el = {
@@ -188,12 +189,14 @@ function bindNavigation() {
     clearStructureParamInUrl();
     setContributionMode("experience");
     state.editingStructureId = null;
+    state.editingContactContributionId = null;
     setContribReturnTarget(null);
     showView("contrib");
   });
   el.goAddStructure.addEventListener("click", () => {
     clearStructureParamInUrl();
     state.editingStructureId = null;
+    state.editingContactContributionId = null;
     setContribReturnTarget(null);
     state.contributionMode = "new_structure";
     setContributionMode("new_structure");
@@ -262,6 +265,7 @@ function bindNavigation() {
     if (!group) return;
     state.contributionMode = "add_experience";
     state.editingStructureId = group.id;
+    state.editingContactContributionId = null;
     setContribReturnTarget(group.id);
     setContributionMode("add_experience");
     prefillContributionForm(group.primary);
@@ -274,6 +278,7 @@ function bindNavigation() {
     if (!group) return;
     state.contributionMode = "edit_structure";
     state.editingStructureId = group.id;
+    state.editingContactContributionId = null;
     setContribReturnTarget(group.id);
     setContributionMode("edit_structure");
     prefillContributionForm(group.primary);
@@ -286,6 +291,7 @@ function bindNavigation() {
     if (!group) return;
     state.contributionMode = "add_contact";
     state.editingStructureId = group.id;
+    state.editingContactContributionId = null;
     setContribReturnTarget(group.id);
     setContributionMode("add_contact");
     prefillContributionForm(group.primary);
@@ -829,6 +835,7 @@ function bindContributionForm() {
     const isAddContactMode = state.contributionMode === "add_contact";
     const submitMode = state.contributionMode;
     const submitStructureId = state.editingStructureId;
+    const submitContactContributionId = clean(state.editingContactContributionId);
     const postes = [...el.contribForm.querySelectorAll('input[name="postes"]:checked')].map((i) => i.value);
     if ((state.contributionMode === "experience" || isAddContactMode) && postes.length === 0) {
       el.contribStatus.textContent = "Sélectionnez au moins une fonction/poste.";
@@ -860,7 +867,7 @@ function bindContributionForm() {
     const typeStructure = clean(data.get("typeStructure"));
 
     const entry = {
-      entryType: isAddContactMode ? "contact" : "experience",
+      entryType: isAddContactMode ? "contact" : isNewStructureMode ? "new_structure" : "experience",
       structureId: (isAddContactMode || isAddExperienceMode) ? clean(submitStructureId) : "",
       secteur: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.secteur) : clean(data.get("secteur")),
       typeStructure: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typeStructure) : clean(typeStructure),
@@ -940,11 +947,45 @@ function bindContributionForm() {
       } else {
         savedRemotely = false;
       }
+
+      const existingEdit =
+        state.structureEdits[structureId] && typeof state.structureEdits[structureId] === "object"
+          ? state.structureEdits[structureId]
+          : null;
+      if (isStructureDeleted(existingEdit)) {
+        const restoredEdit = { ...existingEdit, deleted: false };
+        state.structureEdits[structureId] = restoredEdit;
+        await persistStructureEdit(structureId, restoredEdit);
+        saveStructureEdits(state.structureEdits);
+      }
+
+      if (!savedRemotely) {
+        const fallbackEntry = {
+          ...entry,
+          entryType: "new_structure",
+          structureId,
+          source: "Contribution étudiante",
+        };
+        state.localContribs.unshift(fallbackEntry);
+        await persistContribution(fallbackEntry);
+        saveLocalContributions(state.localContribs);
+      }
+
       state.remoteData.push(structureRecord);
     } else {
-      state.localContribs.unshift(entry);
-      savedRemotely = await persistContribution(entry);
-      saveLocalContributions(state.localContribs);
+      if (isAddContactMode && submitContactContributionId) {
+        savedRemotely = await updateContributionById(submitContactContributionId, entry);
+        state.localContribs = state.localContribs.map((item) =>
+          clean(item._contributionId) === submitContactContributionId
+            ? { ...entry, _contributionId: submitContactContributionId }
+            : item
+        );
+        saveLocalContributions(state.localContribs);
+      } else {
+        state.localContribs.unshift(entry);
+        savedRemotely = await persistContribution(entry);
+        saveLocalContributions(state.localContribs);
+      }
     }
 
     el.contribForm.reset();
@@ -961,9 +1002,10 @@ function bindContributionForm() {
         : "Structure ajoutée seulement sur cet appareil.";
       el.contribStatus.className = "text-sm text-green-700";
     } else if (state.contributionMode === "add_contact") {
+      const actionLabel = submitContactContributionId ? "Contact modifié" : "Contact ajouté";
       el.contribStatus.textContent = savedRemotely
-        ? "Contact ajouté et enregistré dans la base en ligne."
-        : "Contact ajouté seulement sur cet appareil.";
+        ? `${actionLabel} et enregistré dans la base en ligne.`
+        : `${actionLabel} seulement sur cet appareil.`;
       el.contribStatus.className = "text-sm text-green-700";
     } else if (state.contributionMode === "add_experience") {
       el.contribStatus.textContent = savedRemotely
@@ -978,6 +1020,7 @@ function bindContributionForm() {
     }
     state.contributionMode = "experience";
     state.editingStructureId = null;
+    state.editingContactContributionId = null;
     setContributionMode("experience");
     await syncSharedState();
     updateCount();
@@ -1898,6 +1941,17 @@ function renderContactsForStructure(group) {
         <p class="text-sm text-slate-900"><span class="font-semibold">Fonction:</span> ${escapeHtml(contact.poste || "-")}</p>
         <p class="mt-2 text-sm text-slate-900"><span class="font-semibold">Email:</span> ${contact.email ? `<a class="text-cyan-700 hover:underline" href="mailto:${escapeHtml(contact.email)}">${escapeHtml(contact.email)}</a>` : "-"}</p>
         <p class="text-sm text-slate-900"><span class="font-semibold">Téléphone:</span> ${contact.telephone ? `<a class="text-cyan-700 hover:underline" href="tel:${escapeHtml(contact.telephone)}">${escapeHtml(contact.telephone)}</a>` : "-"}</p>
+        <button
+          data-edit-contact="1"
+          data-contact-id="${escapeHtml(contact.contributionId || "")}"
+          data-contact-genre="${escapeHtml(contact.genre || "")}"
+          data-contact-poste="${escapeHtml(contact.poste || "")}"
+          data-contact-email="${escapeHtml(contact.email || "")}"
+          data-contact-telephone="${escapeHtml(contact.telephone || "")}"
+          class="mt-3 rounded-lg border border-cyan-300 px-3 py-1 text-xs text-cyan-700 hover:bg-cyan-50"
+        >
+          Modifier ce contact
+        </button>
         ${
           contact.isContribution && contact.contributionId
             ? `<button data-delete-contact-id="${escapeHtml(contact.contributionId)}" class="mt-3 rounded-lg border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-50">Supprimer ce contact</button>`
@@ -1910,6 +1964,31 @@ function renderContactsForStructure(group) {
 }
 
 async function onDetailContactsClick(event) {
+  const editBtn = event.target.closest("[data-edit-contact]");
+  if (editBtn) {
+    const structureId = clean(state.activeStructureId);
+    const group = findStructureGroupById(structureId);
+    if (!group) return;
+    state.contributionMode = "add_contact";
+    state.editingStructureId = group.id;
+    state.editingContactContributionId = clean(editBtn.getAttribute("data-contact-id"));
+    setContribReturnTarget(group.id);
+    setContributionMode("add_contact");
+    prefillContributionForm(group.primary);
+    prefillContactForm({
+      genre: clean(editBtn.getAttribute("data-contact-genre")),
+      poste: clean(editBtn.getAttribute("data-contact-poste")),
+      email: clean(editBtn.getAttribute("data-contact-email")),
+      telephone: clean(editBtn.getAttribute("data-contact-telephone")),
+    });
+    showView("contrib");
+    el.contribStatus.textContent = state.editingContactContributionId
+      ? "Mode modification contact: mettez à jour les infos puis enregistrez."
+      : "Mode modification contact: enregistrez pour ajouter une version mise à jour de ce contact.";
+    el.contribStatus.className = "text-sm text-cyan-700";
+    return;
+  }
+
   const btn = event.target.closest("[data-delete-contact-id]");
   if (!btn) return;
   const contributionId = clean(btn.getAttribute("data-delete-contact-id"));
@@ -2159,6 +2238,24 @@ function prefillContributionForm(record) {
     if (checkedRadio) checkedRadio.checked = false;
   }
   updateDurationFieldState();
+}
+
+function prefillContactForm(contact) {
+  const genreInput = el.contribForm.querySelector('[name="genre"]');
+  if (genreInput) genreInput.value = clean(contact?.genre);
+  const emailInput = el.contribForm.querySelector('[name="email"]');
+  if (emailInput) emailInput.value = clean(contact?.email);
+  const telInput = el.contribForm.querySelector('[name="telephone"]');
+  if (telInput) telInput.value = clean(contact?.telephone);
+
+  const selectedPostes = clean(contact?.poste)
+    .split(",")
+    .map((item) => clean(item))
+    .filter(Boolean);
+  const selectedSet = new Set(selectedPostes.map((item) => normalizeForSearch(item)));
+  [...el.contribForm.querySelectorAll('input[name="postes"]')].forEach((checkbox) => {
+    checkbox.checked = selectedSet.has(normalizeForSearch(checkbox.value));
+  });
 }
 
 function ensureSelectOptionExists(selectEl, value, label) {
@@ -2421,6 +2518,13 @@ async function persistContribution(entry) {
   } catch {
     return false;
   }
+}
+
+async function updateContributionById(contributionId, entry) {
+  if (!contributionId) return false;
+  if (!supabaseClient) return false;
+  const { error } = await supabaseClient.from("contributions").update({ entry }).eq("id", contributionId);
+  return !error;
 }
 
 async function deleteContributionById(contributionId) {
