@@ -92,6 +92,8 @@ const el = {
   goSpreadsheet: document.getElementById("goSpreadsheet"),
   goPersonal: document.getElementById("goPersonal"),
   goAccount: document.getElementById("goAccount"),
+  searchGoPersonal: document.getElementById("searchGoPersonal"),
+  searchGoAccount: document.getElementById("searchGoAccount"),
   backFromSearch: document.getElementById("backFromSearch"),
   backFromPersonal: document.getElementById("backFromPersonal"),
   backFromAccount: document.getElementById("backFromAccount"),
@@ -216,7 +218,15 @@ function bindNavigation() {
     showView("personal");
     renderPersonalView();
   });
+  el.searchGoPersonal.addEventListener("click", () => {
+    showView("personal");
+    renderPersonalView();
+  });
   el.goAccount.addEventListener("click", () => {
+    showView("account");
+    renderAccountState();
+  });
+  el.searchGoAccount.addEventListener("click", () => {
     showView("account");
     renderAccountState();
   });
