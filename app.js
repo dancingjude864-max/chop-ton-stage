@@ -73,6 +73,7 @@ const state = {
   routeApplied: false,
   contributionMode: "experience",
   editingStructureId: null,
+  pendingConcernStructureId: null,
 };
 
 const el = {
@@ -135,6 +136,8 @@ const el = {
   resetFilters: document.getElementById("resetFilters"),
   filterTypeStructure: document.getElementById("filterTypeStructure"),
   filterTypeStructureList: document.getElementById("filterTypeStructureList"),
+  filterAssociation: document.getElementById("filterAssociation"),
+  filterAssociationList: document.getElementById("filterAssociationList"),
   filterSecteur: document.getElementById("filterSecteur"),
   filterPublicCategory: document.getElementById("filterPublicCategory"),
   filterLocation: document.getElementById("filterLocation"),
@@ -149,9 +152,16 @@ const el = {
   contribSubmitBtn: document.getElementById("contribSubmitBtn"),
   contribTypeStructure: document.getElementById("contribTypeStructure"),
   contribTypeStructureList: document.getElementById("contribTypeStructureList"),
+  contribAssociation: document.getElementById("contribAssociation"),
+  contribAssociationList: document.getElementById("contribAssociationList"),
   contribSecteur: document.getElementById("contribSecteur"),
   contribPublic: document.getElementById("contribPublic"),
   dureeHint: document.getElementById("dureeHint"),
+  concernModal: document.getElementById("concernModal"),
+  concernText: document.getElementById("concernText"),
+  concernApplyAssociation: document.getElementById("concernApplyAssociation"),
+  concernCancelBtn: document.getElementById("concernCancelBtn"),
+  concernSaveBtn: document.getElementById("concernSaveBtn"),
 };
 
 init();
@@ -290,6 +300,8 @@ function bindNavigation() {
   el.detailReportErrorBtn.addEventListener("click", onReportStructureError);
   el.detailReportConcernBtn.addEventListener("click", onReportStructureConcern);
   el.detailDeleteStructureBtn.addEventListener("click", onDeleteStructureFromDetail);
+  el.concernCancelBtn.addEventListener("click", closeConcernModal);
+  el.concernSaveBtn.addEventListener("click", onSaveConcernReport);
   document.addEventListener("click", (event) => {
     const insideMenu = event.target.closest("#detailFlagMenu");
     const onTrigger = event.target.closest("#detailFlagStructure");
@@ -298,6 +310,7 @@ function bindNavigation() {
 
   el.resetFilters.addEventListener("click", () => {
     el.filterTypeStructure.value = "";
+    el.filterAssociation.value = "";
     el.filterSecteur.value = "";
     el.filterLocation.value = "";
     el.filterPublicCategory.value = "";
@@ -317,6 +330,7 @@ function showView(view) {
   el.accountView.classList.toggle("hidden", view !== "account");
   el.contribView.classList.toggle("hidden", view !== "contrib");
   if (view !== "detail") closeFlagMenu();
+  if (view !== "detail") closeConcernModal();
 }
 
 function setContribReturnTarget(structureId) {
@@ -698,6 +712,7 @@ function setupStaticSelects() {
   fillSelect(el.filterSecteur, secteurs, "Tous");
   fillSelect(el.contribSecteur, secteurs, "Sélectionner");
   refreshTypeStructureSuggestions();
+  refreshAssociationSuggestions();
 
   setupContribPublicFilter(el.contribPublic, "");
 
@@ -708,6 +723,9 @@ function setupStaticSelects() {
   el.contribTypeStructure.addEventListener("input", () => {
     refreshTypeStructureSuggestions();
   });
+  el.contribAssociation.addEventListener("input", () => {
+    refreshAssociationSuggestions();
+  });
 
   [...el.contribForm.querySelectorAll('input[name="gratification"]')].forEach((radio) => {
     radio.addEventListener("change", updateDurationFieldState);
@@ -717,6 +735,10 @@ function setupStaticSelects() {
 function bindSearchFilters() {
   el.filterTypeStructure.addEventListener("input", () => {
     refreshTypeStructureSuggestions();
+    renderResults();
+  });
+  el.filterAssociation.addEventListener("input", () => {
+    refreshAssociationSuggestions();
     renderResults();
   });
   el.filterSecteur.addEventListener("change", renderResults);
@@ -750,14 +772,34 @@ function refreshTypeStructureSuggestions() {
   setDatalistOptions(el.contribTypeStructureList, contribSuggestions);
 }
 
-function getTypeStructureSuggestions(query, limit = 20) {
+function getDynamicAssociations() {
+  const dynamic = new Set();
+  getStructureGroups().forEach((group) => {
+    const association = clean(group?.primary?.association);
+    if (association) dynamic.add(association);
+  });
+  return [...dynamic].sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+function refreshAssociationSuggestions() {
+  const previousFilterValue = clean(el.filterAssociation.value);
+  const previousContribValue = clean(el.contribAssociation.value);
+  const options = getDynamicAssociations();
+  setDatalistOptions(el.filterAssociationList, getRankedSuggestions(options, previousFilterValue, 20));
+  setDatalistOptions(el.contribAssociationList, getRankedSuggestions(options, previousContribValue, 20));
+}
+
+function getRankedSuggestions(options, query, limit = 20) {
   const normalizedQuery = normalizeForSearch(query);
-  const options = getDynamicTypeStructures();
   const scored = options
     .map((option) => ({ option, score: scoreTypeStructureOption(option, normalizedQuery) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.option.localeCompare(b.option, "fr"));
   return scored.slice(0, limit).map((item) => item.option);
+}
+
+function getTypeStructureSuggestions(query, limit = 20) {
+  return getRankedSuggestions(getDynamicTypeStructures(), query, limit);
 }
 
 function scoreTypeStructureOption(option, normalizedQuery) {
@@ -1013,6 +1055,7 @@ async function loadRemoteCsv() {
     if (supabaseStructures && supabaseStructures.length) {
       state.remoteData = supabaseStructures;
       refreshTypeStructureSuggestions();
+      refreshAssociationSuggestions();
       updateCount();
       applyInitialRoute();
       if (!el.searchView.classList.contains("hidden")) renderResults();
@@ -1035,6 +1078,7 @@ async function loadRemoteCsv() {
     state.remoteData = dataRows.map(toRecord).filter((item) => item.nomStructure);
 
     refreshTypeStructureSuggestions();
+    refreshAssociationSuggestions();
     updateCount();
     applyInitialRoute();
     if (!el.searchView.classList.contains("hidden")) renderResults();
@@ -1126,6 +1170,7 @@ async function syncSharedState() {
 
   if (!changed) return;
   refreshTypeStructureSuggestions();
+  refreshAssociationSuggestions();
   updateCount();
   if (!el.searchView.classList.contains("hidden")) renderResults();
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
@@ -1306,6 +1351,7 @@ function isExperienceEntry(entry) {
 
 function renderResults() {
   const typeStructure = el.filterTypeStructure.value.trim().toLowerCase();
+  const association = el.filterAssociation.value.trim().toLowerCase();
   const secteur = el.filterSecteur.value.trim().toLowerCase();
   const selectedPublicCategory = el.filterPublicCategory.value.trim().toLowerCase();
   const location = el.filterLocation.value.trim().toLowerCase();
@@ -1316,11 +1362,14 @@ function renderResults() {
     const item = group.primary;
     const itemType = clean(item?.typeStructure).toLowerCase();
     const itemSecteur = clean(item?.secteur).toLowerCase();
+    const itemAssociation = clean(item?.association).toLowerCase();
     const itemPublic = clean(item?.typePublic);
     const itemVille = clean(item?.ville);
     const itemDept = clean(item?.departement);
 
     const passType = !typeStructure || normalizeForSearch(itemType).includes(normalizeForSearch(typeStructure));
+    const passAssociation =
+      !association || normalizeForSearch(itemAssociation).includes(normalizeForSearch(association));
     const passSecteur = !secteur || itemSecteur === secteur;
     const itemPublicCategories = classifyPublicCategories(itemPublic);
     const passPublic =
@@ -1329,7 +1378,7 @@ function renderResults() {
     const passLocation = !location || loc.includes(location);
     const passKeyword = !keyword || group.keywordText.includes(keyword);
 
-    return passType && passSecteur && passPublic && passLocation && passKeyword;
+    return passType && passAssociation && passSecteur && passPublic && passLocation && passKeyword;
   });
 
   const filteredEntries = filtered.reduce((sum, group) => sum + group.records.length, 0);
@@ -1892,6 +1941,22 @@ function closeFlagMenu() {
   el.detailFlagMenu.classList.add("hidden");
 }
 
+function openConcernModal(structureId) {
+  state.pendingConcernStructureId = clean(structureId) || null;
+  el.concernText.value = "";
+  el.concernApplyAssociation.checked = false;
+  el.concernModal.classList.remove("hidden");
+  el.concernModal.classList.add("flex");
+}
+
+function closeConcernModal() {
+  state.pendingConcernStructureId = null;
+  el.concernText.value = "";
+  el.concernApplyAssociation.checked = false;
+  el.concernModal.classList.add("hidden");
+  el.concernModal.classList.remove("flex");
+}
+
 async function onReportStructureError() {
   closeFlagMenu();
   const structureId = clean(state.activeStructureId);
@@ -1924,31 +1989,62 @@ async function onReportStructureConcern() {
   closeFlagMenu();
   const structureId = clean(state.activeStructureId);
   if (!structureId) return;
+  openConcernModal(structureId);
+}
+
+async function onSaveConcernReport() {
+  const structureId = clean(state.pendingConcernStructureId);
+  if (!structureId) return;
   const group = findStructureGroupById(structureId);
-  if (!group) return;
+  if (!group) {
+    closeConcernModal();
+    return;
+  }
+  const details = clean(el.concernText.value);
+  if (!details) {
+    window.alert("Renseignez un signalement avant d'enregistrer.");
+    return;
+  }
 
-  const details = clean(
-    window.prompt(
-      "Décrivez le problème observé (bien-être des usagers ou accueil des stagiaires) :",
-      ""
-    )
+  const applyAssociation = Boolean(el.concernApplyAssociation.checked);
+  const targetStructureIds = applyAssociation
+    ? getStructureIdsByAssociation(group.primary?.association)
+    : [structureId];
+  const ids = targetStructureIds.length ? targetStructureIds : [structureId];
+
+  const saveResults = await Promise.all(
+    ids.map(async (id) => {
+      const targetGroup = findStructureGroupById(id);
+      const previousEdit =
+        state.structureEdits[id] && typeof state.structureEdits[id] === "object" ? state.structureEdits[id] : {};
+      const existingAlert = clean(previousEdit.structureAlert || targetGroup?.primary?.structureAlert);
+      const mergedAlert = existingAlert ? `${existingAlert}\n\n${details}` : details;
+      const payload = { ...previousEdit, structureAlert: mergedAlert };
+      state.structureEdits[id] = payload;
+      const saved = await persistStructureEdit(id, payload);
+      return saved;
+    })
   );
-  if (!details) return;
 
-  const existingEdit = (state.structureEdits[structureId] && typeof state.structureEdits[structureId] === "object")
-    ? state.structureEdits[structureId]
-    : {};
-  const existingAlert = clean(existingEdit.structureAlert || group.primary?.structureAlert);
-  const mergedAlert = existingAlert ? `${existingAlert}\n\n${details}` : details;
-  const payload = { ...existingEdit, structureAlert: mergedAlert };
-
-  const savedRemotely = await persistStructureEdit(structureId, payload);
-  state.structureEdits[structureId] = payload;
   saveStructureEdits(state.structureEdits);
+  closeConcernModal();
   if (!el.searchView.classList.contains("hidden")) renderResults();
   if (state.activeStructureId) openStructureDetail(state.activeStructureId);
 
-  window.alert(savedRemotely ? "Signalement enregistré." : "Signalement enregistré localement uniquement.");
+  const allSaved = saveResults.every(Boolean);
+  window.alert(
+    allSaved
+      ? "Signalement enregistré."
+      : "Signalement enregistré partiellement (certaines écritures distantes ont échoué)."
+  );
+}
+
+function getStructureIdsByAssociation(association) {
+  const target = normalizeForSearch(association);
+  if (!target) return [];
+  return getStructureGroups()
+    .filter((group) => normalizeForSearch(group?.primary?.association) === target)
+    .map((group) => group.id);
 }
 
 async function onDeleteStructureFromDetail() {
@@ -2083,6 +2179,7 @@ function setContributionMode(mode) {
   else if (mode === "add_experience") state.contributionMode = "add_experience";
   else state.contributionMode = "experience";
   refreshTypeStructureSuggestions();
+  refreshAssociationSuggestions();
 
   const isEdit = state.contributionMode === "edit_structure";
   const isNewStructure = state.contributionMode === "new_structure";

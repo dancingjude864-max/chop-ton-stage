@@ -111,7 +111,7 @@
           </button>
         </div>
 
-        <div class="grid gap-4 rounded-2xl border border-indigo-300/35 bg-slate-950/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid gap-4 rounded-2xl border border-indigo-300/35 bg-slate-950/45 p-4 sm:grid-cols-2 lg:grid-cols-5">
           <label class="block text-sm">
             <span class="mb-1 block font-semibold text-slate-700">Cherchez par type de structure</span>
             <input
@@ -129,6 +129,18 @@
             <select id="filterSecteur" class="w-full rounded-lg border border-slate-300 px-3 py-2">
               <option value="">Tous</option>
             </select>
+          </label>
+
+          <label class="block text-sm">
+            <span class="mb-1 block font-semibold text-slate-700">Association/Fondation</span>
+            <input
+              id="filterAssociation"
+              type="text"
+              list="filterAssociationList"
+              placeholder="Rechercher une association"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+            <datalist id="filterAssociationList"></datalist>
           </label>
 
           <label class="block text-sm">
@@ -358,7 +370,14 @@
               </label>
 
               <label class="text-sm font-medium">Association/Fondation
-                <input name="association" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input
+                  id="contribAssociation"
+                  name="association"
+                  list="contribAssociationList"
+                  placeholder="Tapez pour chercher ou ajouter une association"
+                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                />
+                <datalist id="contribAssociationList"></datalist>
               </label>
 
               <label class="text-sm font-medium">Ville
@@ -494,6 +513,38 @@
             <p id="contribStatus" class="text-sm text-slate-600"></p>
           </div>
         </form>
+      </section>
+
+      <section
+        id="concernModal"
+        class="panel fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/70 p-4"
+      >
+        <div class="w-full max-w-xl rounded-2xl border border-amber-300/40 bg-slate-900 p-5 shadow-2xl">
+          <h3 class="text-lg font-bold text-amber-200">Signaler la structure</h3>
+          <p class="mt-1 text-sm text-slate-300">
+            Décrivez un problème concernant le bien-être des usagers ou l'accueil des stagiaires.
+          </p>
+          <label class="mt-4 block text-sm font-medium text-slate-200">
+            Signalement
+            <textarea
+              id="concernText"
+              rows="5"
+              class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100"
+            ></textarea>
+          </label>
+          <label class="mt-3 inline-flex items-center gap-2 text-sm text-slate-200">
+            <input id="concernApplyAssociation" type="checkbox" />
+            Ce signalement s'applique à toute l'association
+          </label>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="concernCancelBtn" type="button" class="rounded-lg border border-slate-500 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+              Annuler
+            </button>
+            <button id="concernSaveBtn" type="button" class="rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-500/10">
+              Enregistrer le signalement
+            </button>
+          </div>
+        </div>
       </section>
     </main>
 
