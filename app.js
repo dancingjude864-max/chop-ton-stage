@@ -160,6 +160,7 @@ const el = {
   filterPublicCategory: document.getElementById("filterPublicCategory"),
   filterLocation: document.getElementById("filterLocation"),
   filterKeyword: document.getElementById("filterKeyword"),
+  applySearchBtn: document.getElementById("applySearchBtn"),
   results: document.getElementById("results"),
   resultMeta: document.getElementById("resultMeta"),
   contribForm: document.getElementById("contribForm"),
@@ -795,20 +796,30 @@ function setupStaticSelects() {
 }
 
 function bindSearchFilters() {
-  const debouncedRender = debounce(renderResults, 180);
-
   el.filterTypeStructure.addEventListener("input", () => {
     refreshTypeStructureSuggestions();
-    debouncedRender();
   });
   el.filterAssociation.addEventListener("input", () => {
     refreshAssociationSuggestions();
-    debouncedRender();
   });
   el.filterSecteur.addEventListener("change", renderResults);
   el.filterPublicCategory.addEventListener("change", renderResults);
-  el.filterLocation.addEventListener("input", debouncedRender);
-  el.filterKeyword.addEventListener("input", debouncedRender);
+  el.applySearchBtn.addEventListener("click", renderResults);
+
+  const textSearchInputs = [
+    el.filterTypeStructure,
+    el.filterAssociation,
+    el.filterLocation,
+    el.filterKeyword,
+  ];
+  textSearchInputs.forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      renderResults();
+    });
+  });
+
   el.results.addEventListener("click", onResultsClick);
   el.results.addEventListener("change", onTrackingChange);
   el.detailTrackingControls.addEventListener("change", onTrackingChange);
@@ -1032,14 +1043,6 @@ function setDatalistOptions(datalistEl, options) {
   datalistEl.innerHTML = options
     .map((value) => `<option value="${escapeHtml(value)}"></option>`)
     .join("");
-}
-
-function debounce(fn, delay = 150) {
-  let timerId = null;
-  return (...args) => {
-    if (timerId) clearTimeout(timerId);
-    timerId = setTimeout(() => fn(...args), delay);
-  };
 }
 
 function bindContributionForm() {

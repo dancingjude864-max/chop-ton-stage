@@ -173,12 +173,23 @@
         <div class="mt-4 rounded-2xl border border-indigo-300/35 bg-slate-950/45 p-4">
           <label class="block text-sm">
             <span class="mb-1 block font-semibold text-slate-700">Mot-clé</span>
-            <input
-              id="filterKeyword"
-              type="text"
-              placeholder="Ex: mission, CHRS, Paris, DE ES, etc."
-              class="w-full rounded-lg border border-slate-300 px-3 py-2"
-            />
+            <div class="flex items-center gap-2">
+              <input
+                id="filterKeyword"
+                type="text"
+                placeholder="Ex: mission, CHRS, Paris, DE ES, etc."
+                class="w-full rounded-lg border border-slate-300 px-3 py-2"
+              />
+              <button
+                id="applySearchBtn"
+                type="button"
+                aria-label="Lancer la recherche"
+                title="Lancer la recherche"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-base hover:bg-slate-100"
+              >
+                🔎
+              </button>
+            </div>
           </label>
         </div>
 
