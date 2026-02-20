@@ -90,7 +90,6 @@ const state = {
   duplicateCandidateId: null,
   ignoredDuplicateCandidateId: null,
   searchShowAll: false,
-  contribTypeStructureTokens: [],
 };
 
 const el = {
@@ -176,10 +175,12 @@ const el = {
   contribStageDetails: document.getElementById("contribStageDetails"),
   contribSubmitBtn: document.getElementById("contribSubmitBtn"),
   contribTypeStructure: document.getElementById("contribTypeStructure"),
-  contribTypeStructureInput: document.getElementById("contribTypeStructureInput"),
-  contribTypeStructureChips: document.getElementById("contribTypeStructureChips"),
+  contribTypeStructureFields: document.getElementById("contribTypeStructureFields"),
+  addTypeStructureFieldBtn: document.getElementById("addTypeStructureFieldBtn"),
   contribTypeStructureList: document.getElementById("contribTypeStructureList"),
   contribAssociation: document.getElementById("contribAssociation"),
+  contribAssociationFields: document.getElementById("contribAssociationFields"),
+  addAssociationFieldBtn: document.getElementById("addAssociationFieldBtn"),
   contribAssociationList: document.getElementById("contribAssociationList"),
   contribSecteur: document.getElementById("contribSecteur"),
   contribPublic: document.getElementById("contribPublic"),
@@ -243,7 +244,8 @@ function bindNavigation() {
     state.contributionMode = "new_structure";
     setContributionMode("new_structure");
     el.contribForm.reset();
-    setContribTypeStructureTokensFromValue("");
+    setContribTypeStructureValuesFromString("");
+    setContribAssociationValuesFromString("");
     setupContribPublicFilter(el.contribPublic, "");
     hideDuplicateSuggestion();
     showView("contrib");
@@ -790,11 +792,9 @@ function setupStaticSelects() {
     setupContribPublicFilter(el.contribPublic, el.contribSecteur.value);
   });
 
-  bindContribTypeStructureTagInput();
-  setContribTypeStructureTokensFromValue("");
-  el.contribAssociation.addEventListener("input", () => {
-    refreshAssociationSuggestions();
-  });
+  bindContribMultiFieldInputs();
+  setContribTypeStructureValuesFromString("");
+  setContribAssociationValuesFromString("");
 
   [...el.contribForm.querySelectorAll('input[name="gratification"]')].forEach((radio) => {
     radio.addEventListener("change", updateDurationFieldState);
@@ -998,132 +998,190 @@ function getDynamicTypeStructures() {
 
 function refreshTypeStructureSuggestions() {
   const previousFilterValue = clean(el.filterTypeStructure.value);
-  const previousContribValue = clean(el.contribTypeStructureInput.value);
+  const previousContribValue = clean(getFocusedContribFieldValue("contrib-type-structure-input"));
   const filterSuggestions = getTypeStructureSuggestions(getLastMultiTypeToken(previousFilterValue), 20);
   const contribSuggestions = getTypeStructureSuggestions(getLastMultiTypeToken(previousContribValue), 20);
   setDatalistOptions(el.filterTypeStructureList, filterSuggestions);
   setDatalistOptions(el.contribTypeStructureList, contribSuggestions);
 }
 
-function bindContribTypeStructureTagInput() {
-  if (!el.contribTypeStructureInput || !el.contribTypeStructureChips) return;
+function bindContribMultiFieldInputs() {
+  bindContribMultiInput({
+    container: el.contribTypeStructureFields,
+    addBtn: el.addTypeStructureFieldBtn,
+    hiddenInput: el.contribTypeStructure,
+    listId: "contribTypeStructureList",
+    inputClass: "contrib-type-structure-input",
+    placeholder: "Chercher un type de structure",
+    required: true,
+    normalizeValue: (value) => canonicalizeFromOptions(value, getDynamicTypeStructures()),
+    onInput: refreshTypeStructureSuggestions,
+  });
 
-  const commitFromInput = () => {
-    addContribTypeStructureToken(el.contribTypeStructureInput.value);
-    el.contribTypeStructureInput.value = "";
-    refreshTypeStructureSuggestions();
+  bindContribMultiInput({
+    container: el.contribAssociationFields,
+    addBtn: el.addAssociationFieldBtn,
+    hiddenInput: el.contribAssociation,
+    listId: "contribAssociationList",
+    inputClass: "contrib-association-input",
+    placeholder: "Chercher une association/fondation",
+    required: false,
+    normalizeValue: (value) => canonicalizeFromOptions(value, getDynamicAssociations()),
+    onInput: refreshAssociationSuggestions,
+  });
+}
+
+function bindContribMultiInput({
+  container,
+  addBtn,
+  hiddenInput,
+  listId,
+  inputClass,
+  placeholder,
+  required,
+  normalizeValue,
+  onInput,
+}) {
+  if (!container || !hiddenInput || !addBtn) return;
+
+  const syncHidden = () => {
+    const values = [...container.querySelectorAll(`.${inputClass}`)]
+      .map((input) => normalizeValue(input.value))
+      .map((value) => clean(value))
+      .filter(Boolean);
+    hiddenInput.value = values.join(" | ");
   };
 
-  el.contribTypeStructureInput.addEventListener("input", () => {
-    refreshTypeStructureSuggestions();
+  const addField = (value = "") => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex items-center gap-2";
+    wrapper.innerHTML = `
+      <input
+        type="text"
+        list="${listId}"
+        placeholder="${escapeHtml(placeholder)}"
+        class="${inputClass} w-full rounded-lg border border-slate-300 px-3 py-2"
+      />
+      <button type="button" class="remove-contrib-multi-field rounded-lg border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100" aria-label="Retirer">×</button>
+    `;
+    container.appendChild(wrapper);
+    const input = wrapper.querySelector(`.${inputClass}`);
+    if (input) input.value = clean(value);
+    syncHidden();
+    updateButtons();
+    return input;
+  };
+
+  const updateButtons = () => {
+    const rows = [...container.querySelectorAll(".remove-contrib-multi-field")];
+    rows.forEach((btn, idx) => {
+      btn.classList.toggle("hidden", rows.length === 1 && idx === 0);
+    });
+    const inputs = [...container.querySelectorAll(`.${inputClass}`)];
+    inputs.forEach((input) => {
+      input.required = required && inputs.length === 1;
+    });
+  };
+
+  addBtn.addEventListener("click", () => {
+    const newInput = addField("");
+    if (newInput) newInput.focus();
+    if (onInput) onInput();
   });
 
-  el.contribTypeStructureInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === "," || event.key === ";") {
-      event.preventDefault();
-      commitFromInput();
-    }
-    if (event.key === "Backspace" && !clean(el.contribTypeStructureInput.value)) {
-      if (state.contribTypeStructureTokens.length > 0) {
-        state.contribTypeStructureTokens.pop();
-        syncContribTypeStructureHiddenInput();
-        renderContribTypeStructureChips();
-      }
-    }
+  container.addEventListener("input", (event) => {
+    if (!event.target.classList.contains(inputClass)) return;
+    syncHidden();
+    if (onInput) onInput();
   });
 
-  el.contribTypeStructureInput.addEventListener("blur", () => {
-    if (!clean(el.contribTypeStructureInput.value)) return;
-    commitFromInput();
+  container.addEventListener("change", (event) => {
+    if (!event.target.classList.contains(inputClass)) return;
+    event.target.value = normalizeValue(event.target.value);
+    syncHidden();
+    if (onInput) onInput();
   });
 
-  el.contribTypeStructureChips.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-remove-type-token]");
+  container.addEventListener("click", (event) => {
+    const btn = event.target.closest(".remove-contrib-multi-field");
     if (!btn) return;
-    const tokenToRemove = normalizeForSearch(btn.getAttribute("data-remove-type-token"));
-    state.contribTypeStructureTokens = state.contribTypeStructureTokens.filter(
-      (token) => normalizeForSearch(token) !== tokenToRemove
-    );
-    syncContribTypeStructureHiddenInput();
-    renderContribTypeStructureChips();
-    refreshTypeStructureSuggestions();
+    const rows = container.querySelectorAll(".remove-contrib-multi-field");
+    if (rows.length <= 1) return;
+    btn.parentElement.remove();
+    syncHidden();
+    updateButtons();
+    if (onInput) onInput();
   });
+
+  container.innerHTML = "";
+  addField("");
 }
 
-function addContribTypeStructureToken(rawValue) {
-  splitMultiTypeStructureValues(rawValue).forEach((token) => {
-    const canonical = canonicalizeTypeStructureToken(token);
-    if (!canonical) return;
-    const exists = state.contribTypeStructureTokens.some(
-      (existing) => normalizeForSearch(existing) === normalizeForSearch(canonical)
-    );
-    if (exists) return;
-    state.contribTypeStructureTokens.push(canonical);
-  });
-  syncContribTypeStructureHiddenInput();
-  renderContribTypeStructureChips();
+function setContribTypeStructureValuesFromString(value) {
+  setContribMultiFieldValues(el.contribTypeStructureFields, "contrib-type-structure-input", value);
+  syncContribMultiFieldHidden(el.contribTypeStructureFields, "contrib-type-structure-input", el.contribTypeStructure);
 }
 
-function canonicalizeTypeStructureToken(token) {
-  const value = clean(token);
+function setContribAssociationValuesFromString(value) {
+  setContribMultiFieldValues(el.contribAssociationFields, "contrib-association-input", value);
+  syncContribMultiFieldHidden(el.contribAssociationFields, "contrib-association-input", el.contribAssociation);
+}
+
+function setContribMultiFieldValues(container, inputClass, value) {
+  if (!container) return;
+  const values = splitMultiTypeStructureValues(value);
+  const initialInputs = [...container.querySelectorAll(`.${inputClass}`)];
+  if (!initialInputs.length) return;
+  while (container.querySelectorAll(`.${inputClass}`).length < Math.max(1, values.length)) {
+    const addBtn = container === el.contribTypeStructureFields ? el.addTypeStructureFieldBtn : el.addAssociationFieldBtn;
+    addBtn?.click();
+  }
+  const finalInputs = [...container.querySelectorAll(`.${inputClass}`)];
+  finalInputs.forEach((input, idx) => {
+    input.value = values[idx] || "";
+  });
+  for (let i = finalInputs.length - 1; i > 0; i -= 1) {
+    if (clean(finalInputs[i].value)) continue;
+    const removeBtn = finalInputs[i].parentElement?.querySelector(".remove-contrib-multi-field");
+    removeBtn?.click();
+  }
+}
+
+function syncContribMultiFieldHidden(container, inputClass, hiddenInput) {
+  if (!container || !hiddenInput) return;
+  const values = [...container.querySelectorAll(`.${inputClass}`)]
+    .map((input) => clean(input.value))
+    .filter(Boolean);
+  hiddenInput.value = values.join(" | ");
+}
+
+function getFocusedContribFieldValue(inputClass) {
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains(inputClass)) return clean(active.value);
+  return "";
+}
+
+function canonicalizeFromOptions(rawValue, options) {
+  const value = clean(rawValue);
   if (!value) return "";
   const normalized = normalizeForSearch(value);
-  const options = getDynamicTypeStructures();
   const fromList = options.find((item) => normalizeForSearch(item) === normalized);
   return fromList || value;
-}
-
-function syncContribTypeStructureHiddenInput() {
-  if (!el.contribTypeStructure) return;
-  el.contribTypeStructure.value = state.contribTypeStructureTokens.join(" | ");
-}
-
-function renderContribTypeStructureChips() {
-  if (!el.contribTypeStructureChips) return;
-  if (!state.contribTypeStructureTokens.length) {
-    el.contribTypeStructureChips.innerHTML = "";
-    return;
-  }
-  el.contribTypeStructureChips.innerHTML = state.contribTypeStructureTokens
-    .map(
-      (token) => `
-        <span class="inline-flex items-center gap-1 rounded-full border border-cyan-300/50 bg-cyan-500/15 px-2 py-1 text-xs text-cyan-100">
-          ${escapeHtml(token)}
-          <button
-            type="button"
-            data-remove-type-token="${escapeHtml(token)}"
-            class="rounded-full px-1 text-cyan-100 hover:bg-cyan-400/25"
-            aria-label="Retirer ${escapeHtml(token)}"
-            title="Retirer"
-          >
-            ×
-          </button>
-        </span>
-      `
-    )
-    .join("");
-}
-
-function setContribTypeStructureTokensFromValue(value) {
-  state.contribTypeStructureTokens = [];
-  splitMultiTypeStructureValues(value).forEach((token) => addContribTypeStructureToken(token));
-  if (el.contribTypeStructureInput) el.contribTypeStructureInput.value = "";
-  syncContribTypeStructureHiddenInput();
-  renderContribTypeStructureChips();
 }
 
 function getDynamicAssociations() {
   const dynamic = new Set();
   getStructureGroups().forEach((group) => {
-    const association = clean(group?.primary?.association);
-    if (association) dynamic.add(association);
+    splitMultiTypeStructureValues(group?.primary?.association).forEach((association) => {
+      if (association) dynamic.add(association);
+    });
   });
   return [...dynamic].sort((a, b) => a.localeCompare(b, "fr"));
 }
 
 function refreshAssociationSuggestions() {
   const previousFilterValue = clean(el.filterAssociation.value);
-  const previousContribValue = clean(el.contribAssociation.value);
+  const previousContribValue = clean(getFocusedContribFieldValue("contrib-association-input"));
   const options = getDynamicAssociations();
   setDatalistOptions(el.filterAssociationList, getRankedSuggestions(options, previousFilterValue, 20));
   setDatalistOptions(el.contribAssociationList, getRankedSuggestions(options, previousContribValue, 20));
@@ -1177,12 +1235,8 @@ function bindContributionForm() {
       return;
     }
 
-    // Valide aussi le dernier type en cours de saisie même sans appui sur Entrée.
-    if (el.contribTypeStructureInput && !el.contribTypeStructureInput.disabled) {
-      addContribTypeStructureToken(el.contribTypeStructureInput.value);
-      el.contribTypeStructureInput.value = "";
-      refreshTypeStructureSuggestions();
-    }
+    syncContribMultiFieldHidden(el.contribTypeStructureFields, "contrib-type-structure-input", el.contribTypeStructure);
+    syncContribMultiFieldHidden(el.contribAssociationFields, "contrib-association-input", el.contribAssociation);
 
     const data = new FormData(el.contribForm);
     const baseRecord =
@@ -1337,7 +1391,8 @@ function bindContributionForm() {
     }
 
     el.contribForm.reset();
-    setContribTypeStructureTokensFromValue("");
+    setContribTypeStructureValuesFromString("");
+    setContribAssociationValuesFromString("");
     setupContribPublicFilter(el.contribPublic, "");
 
     if (state.contributionMode === "edit_structure") {
@@ -2880,7 +2935,8 @@ function prefillContributionForm(record) {
   ensureSelectOptionExists(el.contribForm.elements.departement, record.departement, `${record.departement} - Hors IDF`);
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
-  setContribTypeStructureTokensFromValue(record.typeStructure);
+  setContribTypeStructureValuesFromString(record.typeStructure);
+  setContribAssociationValuesFromString(record.association);
   setValue("tolereVoile", record.tolereVoile || "Pas d'infos");
   setValue("structureNotes", record.structureNotes);
 
@@ -2975,9 +3031,11 @@ function setContributionMode(mode) {
       if ("disabled" in field) field.disabled = isAddContact || isAddExperience;
     });
   });
-  if (el.contribTypeStructureInput) {
-    el.contribTypeStructureInput.disabled = isAddContact || isAddExperience;
-  }
+  [...el.contribForm.querySelectorAll(".contrib-type-structure-input, .contrib-association-input")].forEach((field) => {
+    if ("disabled" in field) field.disabled = isAddContact || isAddExperience;
+  });
+  if (el.addTypeStructureFieldBtn) el.addTypeStructureFieldBtn.disabled = isAddContact || isAddExperience;
+  if (el.addAssociationFieldBtn) el.addAssociationFieldBtn.disabled = isAddContact || isAddExperience;
 
   const contactFieldNames = ["genre", "email", "telephone", "postes"];
   contactFieldNames.forEach((name) => {

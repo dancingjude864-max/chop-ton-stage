@@ -403,13 +403,17 @@
               </label>
 
               <label class="text-sm font-medium">Association/Fondation
-                <input
-                  id="contribAssociation"
-                  name="association"
-                  list="contribAssociationList"
-                  placeholder="Tapez pour chercher ou ajouter une association"
-                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
+                <div class="mt-1 space-y-2">
+                  <div id="contribAssociationFields" class="space-y-2"></div>
+                  <button
+                    id="addAssociationFieldBtn"
+                    type="button"
+                    class="rounded-lg border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
+                  >
+                    +
+                  </button>
+                </div>
+                <input id="contribAssociation" name="association" type="hidden" />
                 <datalist id="contribAssociationList"></datalist>
               </label>
 
@@ -432,14 +436,16 @@
               </label>
 
               <label class="text-sm font-medium">Type de structure *
-                <div id="contribTypeStructureChips" class="mt-1 flex flex-wrap gap-2"></div>
-                <input
-                  id="contribTypeStructureInput"
-                  type="text"
-                  list="contribTypeStructureList"
-                  placeholder="Tapez un type puis Entrée"
-                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
+                <div class="mt-1 space-y-2">
+                  <div id="contribTypeStructureFields" class="space-y-2"></div>
+                  <button
+                    id="addTypeStructureFieldBtn"
+                    type="button"
+                    class="rounded-lg border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
+                  >
+                    +
+                  </button>
+                </div>
                 <input id="contribTypeStructure" name="typeStructure" type="hidden" />
                 <datalist id="contribTypeStructureList"></datalist>
               </label>
