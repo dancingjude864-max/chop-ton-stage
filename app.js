@@ -87,9 +87,12 @@ const state = {
   editingStructureId: null,
   pendingConcernStructureId: null,
   editingContactContributionId: null,
+  duplicateCandidateId: null,
+  ignoredDuplicateCandidateId: null,
 };
 
 const el = {
+  siteHeader: document.getElementById("siteHeader"),
   homeView: document.getElementById("homeView"),
   searchView: document.getElementById("searchView"),
   detailView: document.getElementById("detailView"),
@@ -161,6 +164,10 @@ const el = {
   resultMeta: document.getElementById("resultMeta"),
   contribForm: document.getElementById("contribForm"),
   contribStatus: document.getElementById("contribStatus"),
+  contribStructurePicker: document.getElementById("contribStructurePicker"),
+  contribStructureSearch: document.getElementById("contribStructureSearch"),
+  contribStructureSearchResults: document.getElementById("contribStructureSearchResults"),
+  contribSelectedStructure: document.getElementById("contribSelectedStructure"),
   contribStructureDetails: document.getElementById("contribStructureDetails"),
   contribContactDetails: document.getElementById("contribContactDetails"),
   contribStageDetails: document.getElementById("contribStageDetails"),
@@ -171,6 +178,10 @@ const el = {
   contribAssociationList: document.getElementById("contribAssociationList"),
   contribSecteur: document.getElementById("contribSecteur"),
   contribPublic: document.getElementById("contribPublic"),
+  contribDuplicateAlert: document.getElementById("contribDuplicateAlert"),
+  contribDuplicateText: document.getElementById("contribDuplicateText"),
+  duplicateOpenExisting: document.getElementById("duplicateOpenExisting"),
+  duplicateContinue: document.getElementById("duplicateContinue"),
   dureeHint: document.getElementById("dureeHint"),
   concernModal: document.getElementById("concernModal"),
   concernText: document.getElementById("concernText"),
@@ -186,9 +197,12 @@ function init() {
   setupStaticSelects();
   bindSearchFilters();
   bindContributionForm();
+  bindContributionStructurePicker();
+  bindDuplicateActions();
   bindAccountActions();
   setContributionMode("experience");
   renderAccountState();
+  showView("home");
   loadRemoteCsv();
   syncSharedState();
 }
@@ -204,18 +218,27 @@ function bindNavigation() {
     setContributionMode("experience");
     state.editingStructureId = null;
     state.editingContactContributionId = null;
+    state.ignoredDuplicateCandidateId = null;
+    state.duplicateCandidateId = null;
+    el.contribStructureSearch.value = "";
+    el.contribSelectedStructure.textContent = "";
     setContribReturnTarget(null);
     showView("contrib");
+    el.contribStatus.textContent = "Choisissez une structure existante puis ajoutez votre expérience.";
+    el.contribStatus.className = "text-sm text-slate-300";
   });
   el.goAddStructure.addEventListener("click", () => {
     clearStructureParamInUrl();
     state.editingStructureId = null;
     state.editingContactContributionId = null;
+    state.ignoredDuplicateCandidateId = null;
+    state.duplicateCandidateId = null;
     setContribReturnTarget(null);
     state.contributionMode = "new_structure";
     setContributionMode("new_structure");
     el.contribForm.reset();
     setupContribPublicFilter(el.contribPublic, "");
+    hideDuplicateSuggestion();
     showView("contrib");
     el.contribStatus.textContent = "Renseignez les informations de la structure puis enregistrez.";
     el.contribStatus.className = "text-sm text-emerald-700";
@@ -361,6 +384,13 @@ function showView(view) {
   el.connectedView.classList.toggle("hidden", view !== "connected");
   el.accountView.classList.toggle("hidden", view !== "account");
   el.contribView.classList.toggle("hidden", view !== "contrib");
+  if (el.siteHeader) {
+    const isHome = view === "home";
+    el.siteHeader.classList.toggle("pt-36", isHome);
+    el.siteHeader.classList.toggle("pb-0", isHome);
+    el.siteHeader.classList.toggle("pt-24", !isHome);
+    el.siteHeader.classList.toggle("pb-2", !isHome);
+  }
   if (view !== "detail") closeFlagMenu();
   if (view !== "detail") closeConcernModal();
 }
@@ -785,6 +815,155 @@ function bindSearchFilters() {
   el.personalView.addEventListener("click", onPersonalResultsClick);
 }
 
+function bindContributionStructurePicker() {
+  el.contribStructureSearch.addEventListener("input", () => {
+    if (state.contributionMode !== "experience") return;
+    state.editingStructureId = null;
+    renderStructurePickerResults();
+  });
+
+  el.contribStructureSearchResults.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-pick-structure-id]");
+    if (!btn) return;
+    const structureId = clean(btn.getAttribute("data-pick-structure-id"));
+    const group = findStructureGroupById(structureId);
+    if (!group) return;
+    state.editingStructureId = structureId;
+    el.contribSelectedStructure.textContent = `Structure sélectionnée: ${group.primary.nomStructure} (${group.primary.ville || "-"} ${group.primary.departement || "-"})`;
+    renderStructurePickerResults();
+  });
+}
+
+function renderStructurePickerResults() {
+  if (state.contributionMode !== "experience") {
+    el.contribStructureSearchResults.innerHTML = "";
+    return;
+  }
+  const q = normalizeForSearch(el.contribStructureSearch.value);
+  const groups = getStructureGroups();
+  const matches = !q
+    ? groups.slice(0, 8)
+    : groups
+        .filter((group) => {
+          const text = normalizeForSearch(
+            [group.primary.nomStructure, group.primary.association, group.primary.ville, group.primary.departement]
+              .map(clean)
+              .join(" ")
+          );
+          return text.includes(q);
+        })
+        .slice(0, 8);
+
+  if (!matches.length) {
+    el.contribStructureSearchResults.innerHTML =
+      '<p class="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">Aucune structure trouvée.</p>';
+    return;
+  }
+
+  el.contribStructureSearchResults.innerHTML = matches
+    .map((group) => {
+      const selected = state.editingStructureId === group.id;
+      return `
+        <button
+          type="button"
+          data-pick-structure-id="${escapeHtml(group.id)}"
+          class="w-full rounded-lg border px-3 py-2 text-left text-sm ${
+            selected
+              ? "border-cyan-300 bg-cyan-500/20 text-cyan-100"
+              : "border-slate-700 bg-slate-900/70 text-slate-200 hover:bg-slate-800"
+          }"
+        >
+          <span class="font-semibold">${escapeHtml(group.primary.nomStructure)}</span>
+          <span class="block text-xs text-slate-300">${escapeHtml(group.primary.ville || "-")} (${escapeHtml(group.primary.departement || "-")})</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function bindDuplicateActions() {
+  const watchedNames = ["nomStructure", "ville", "departement"];
+  watchedNames.forEach((name) => {
+    const field = el.contribForm.elements[name];
+    if (!field) return;
+    field.addEventListener("input", updateDuplicateSuggestion);
+    field.addEventListener("change", updateDuplicateSuggestion);
+  });
+
+  el.duplicateOpenExisting.addEventListener("click", () => {
+    const structureId = clean(state.duplicateCandidateId);
+    if (!structureId) return;
+    closeDuplicateSuggestion();
+    const url = new URL(window.location.href);
+    url.searchParams.set("structure", structureId);
+    history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    openStructureDetail(structureId);
+  });
+
+  el.duplicateContinue.addEventListener("click", () => {
+    state.ignoredDuplicateCandidateId = clean(state.duplicateCandidateId) || null;
+    hideDuplicateSuggestion();
+  });
+}
+
+function updateDuplicateSuggestion() {
+  if (state.contributionMode !== "new_structure") {
+    hideDuplicateSuggestion();
+    return;
+  }
+  const nom = clean(el.contribForm.elements.nomStructure?.value);
+  if (!nom) {
+    hideDuplicateSuggestion();
+    return;
+  }
+  const ville = clean(el.contribForm.elements.ville?.value);
+  const departement = clean(el.contribForm.elements.departement?.value);
+  const candidate = findSimilarStructureCandidate({ nom, ville, departement });
+  if (!candidate || clean(candidate.id) === clean(state.ignoredDuplicateCandidateId)) {
+    hideDuplicateSuggestion();
+    return;
+  }
+  state.duplicateCandidateId = candidate.id;
+  el.contribDuplicateText.textContent = `Une structure similaire existe déjà: ${candidate.primary.nomStructure} (${candidate.primary.ville || "-"} ${candidate.primary.departement || "-"})`;
+  el.contribDuplicateAlert.classList.remove("hidden");
+}
+
+function hideDuplicateSuggestion() {
+  state.duplicateCandidateId = null;
+  el.contribDuplicateAlert.classList.add("hidden");
+  el.contribDuplicateText.textContent = "";
+}
+
+function closeDuplicateSuggestion() {
+  state.duplicateCandidateId = null;
+  state.ignoredDuplicateCandidateId = null;
+  hideDuplicateSuggestion();
+}
+
+function findSimilarStructureCandidate({ nom, ville, departement }) {
+  const targetName = normalizeForSearch(nom);
+  const targetCity = normalizeForSearch(ville);
+  const targetDept = clean(departement);
+  if (!targetName) return null;
+  const groups = getStructureGroups();
+  const exact = groups.find((group) => {
+    const sameName = normalizeForSearch(group.primary.nomStructure) === targetName;
+    if (!sameName) return false;
+    const sameDept = targetDept && clean(group.primary.departement) === targetDept;
+    const sameCity = targetCity && normalizeForSearch(group.primary.ville) === targetCity;
+    return sameDept || sameCity || (!targetDept && !targetCity);
+  });
+  if (exact) return exact;
+  return (
+    groups.find((group) => {
+      const name = normalizeForSearch(group.primary.nomStructure);
+      if (!(name.includes(targetName) || targetName.includes(name))) return false;
+      if (targetDept && clean(group.primary.departement) !== targetDept) return false;
+      return true;
+    }) || null
+  );
+}
+
 function getDynamicTypeStructures() {
   const dynamic = new Set(TYPE_STRUCTURES.map((item) => clean(item)));
   allRecords().forEach((record) => {
@@ -873,7 +1052,7 @@ function bindContributionForm() {
     const submitStructureId = state.editingStructureId;
     const submitContactContributionId = clean(state.editingContactContributionId);
     const postes = [...el.contribForm.querySelectorAll('input[name="postes"]:checked')].map((i) => i.value);
-    if ((state.contributionMode === "experience" || isAddContactMode) && postes.length === 0) {
+    if (isAddContactMode && postes.length === 0) {
       el.contribStatus.textContent = "Sélectionnez au moins une fonction/poste.";
       el.contribStatus.className = "text-sm text-red-700";
       return;
@@ -881,10 +1060,11 @@ function bindContributionForm() {
 
     const data = new FormData(el.contribForm);
     const baseRecord =
-      (isAddContactMode || isAddExperienceMode) && state.editingStructureId
+      (state.contributionMode === "experience" || isAddContactMode || isAddExperienceMode) &&
+      state.editingStructureId
         ? findStructureGroupById(state.editingStructureId)?.primary || null
         : null;
-    if ((isAddContactMode || isAddExperienceMode) && !baseRecord) {
+    if ((state.contributionMode === "experience" || isAddContactMode || isAddExperienceMode) && !baseRecord) {
       el.contribStatus.textContent = "Impossible de retrouver la structure sélectionnée.";
       el.contribStatus.className = "text-sm text-red-700";
       return;
@@ -901,27 +1081,28 @@ function bindContributionForm() {
       return;
     }
     const typeStructure = clean(data.get("typeStructure"));
+    const isLinkedExperienceMode = state.contributionMode === "experience" || isAddExperienceMode;
 
     const entry = {
       entryType: isAddContactMode ? "contact" : isNewStructureMode ? "new_structure" : "experience",
-      structureId: (isAddContactMode || isAddExperienceMode) ? clean(submitStructureId) : "",
-      secteur: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.secteur) : clean(data.get("secteur")),
-      typeStructure: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typeStructure) : clean(typeStructure),
-      association: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.association) : clean(data.get("association")),
-      departement: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement")),
-      nomStructure: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.nomStructure) : clean(data.get("nomStructure")),
-      email: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("email")),
-      telephone: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("telephone")),
-      poste: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : postes.join(", "),
-      genre: (isEditMode || isNewStructureMode || isAddExperienceMode) ? "" : clean(data.get("genre")),
+      structureId: (isAddContactMode || isLinkedExperienceMode) ? clean(submitStructureId) : "",
+      secteur: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.secteur) : clean(data.get("secteur")),
+      typeStructure: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.typeStructure) : clean(typeStructure),
+      association: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.association) : clean(data.get("association")),
+      departement: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement")),
+      nomStructure: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.nomStructure) : clean(data.get("nomStructure")),
+      email: (isEditMode || isNewStructureMode || isLinkedExperienceMode) ? "" : clean(data.get("email")),
+      telephone: (isEditMode || isNewStructureMode || isLinkedExperienceMode) ? "" : clean(data.get("telephone")),
+      poste: (isEditMode || isNewStructureMode || isLinkedExperienceMode) ? "" : postes.join(", "),
+      genre: (isEditMode || isNewStructureMode || isLinkedExperienceMode) ? "" : clean(data.get("genre")),
       gratification: isAddContactMode ? clean(baseRecord?.gratification) : clean(data.get("gratification")),
       ville: normalizeVilleByDepartement(
-        (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.ville) : clean(data.get("ville")),
-        (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement"))
+        (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.ville) : clean(data.get("ville")),
+        (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement"))
       ),
-      typePublic: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typePublic) : clean(data.get("typePublic")),
-      tolereVoile: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.tolereVoile) : clean(data.get("tolereVoile")),
-      structureNotes: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.structureNotes) : clean(data.get("structureNotes")),
+      typePublic: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.typePublic) : clean(data.get("typePublic")),
+      tolereVoile: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.tolereVoile) : clean(data.get("tolereVoile")),
+      structureNotes: (isAddContactMode || isLinkedExperienceMode) ? clean(baseRecord?.structureNotes) : clean(data.get("structureNotes")),
       duree: isAddContactMode ? clean(baseRecord?.duree) : clean(data.get("duree")),
       diplome: isAddContactMode ? clean(baseRecord?.diplome) : clean(data.get("diplome")),
       missions: isAddContactMode ? clean(baseRecord?.missions) : "",
@@ -1048,7 +1229,7 @@ function bindContributionForm() {
         ? `${actionLabel} et enregistré dans la base en ligne.`
         : `${actionLabel} seulement sur cet appareil.`;
       el.contribStatus.className = "text-sm text-green-700";
-    } else if (state.contributionMode === "add_experience") {
+    } else if (state.contributionMode === "add_experience" || state.contributionMode === "experience") {
       el.contribStatus.textContent = savedRemotely
         ? "Expérience ajoutée et enregistrée dans la base en ligne."
         : "Expérience ajoutée seulement sur cet appareil.";
@@ -1066,7 +1247,10 @@ function bindContributionForm() {
     await syncSharedState();
     updateCount();
 
-    if ((submitMode === "add_contact" || submitMode === "edit_structure" || submitMode === "add_experience") && submitStructureId) {
+    if (
+      (submitMode === "add_contact" || submitMode === "edit_structure" || submitMode === "add_experience" || submitMode === "experience") &&
+      submitStructureId
+    ) {
       openStructureDetail(submitStructureId);
       el.contribStatus.textContent = "";
       showView("detail");
@@ -1085,13 +1269,14 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
   const isNewStructure = mode === "new_structure";
   const isAddContact = mode === "add_contact";
   const isAddExperience = mode === "add_experience";
+  const isHomeExperience = mode === "experience";
 
   const get = (name) => clean(data.get(name));
   const isIdfDepartement = (value) => IDF_DEPARTEMENTS.includes(clean(value));
   const isTwoDigitDept = (value) => /^[0-9]{2}$/.test(clean(value));
   const hasTypeStructure = get("typeStructure");
 
-  if (isExperience || isEdit || isNewStructure) {
+  if (isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
     const departement = get("departement");
     const validDepartement = isIdfDepartement(departement) || (isEdit && isTwoDigitDept(departement));
@@ -1102,8 +1287,7 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
   }
 
   if (isExperience) {
-    if (!get("genre")) return "Renseignez le genre du contact.";
-    if (!postes.length) return "Sélectionnez au moins une fonction/poste.";
+    if (isHomeExperience && !baseRecord) return "Choisissez une structure existante.";
     if (!get("diplome")) return "Le diplôme associé est requis.";
     if (!get("gratification")) return "Indiquez si le stage est gratifié.";
     const isAlternance = normalizeForSearch(get("gratification")) === "alternance";
@@ -2349,10 +2533,12 @@ function setContributionMode(mode) {
   const isNewStructure = state.contributionMode === "new_structure";
   const isAddContact = state.contributionMode === "add_contact";
   const isAddExperience = state.contributionMode === "add_experience";
+  const isHomeExperience = state.contributionMode === "experience";
   const isExperience = state.contributionMode === "experience" || isAddExperience;
 
-  el.contribStructureDetails.classList.toggle("hidden", isAddContact || isAddExperience);
-  el.contribContactDetails.classList.toggle("hidden", isEdit || isNewStructure || isAddExperience);
+  el.contribStructurePicker.classList.toggle("hidden", !isHomeExperience);
+  el.contribStructureDetails.classList.toggle("hidden", isAddContact || isAddExperience || isHomeExperience);
+  el.contribContactDetails.classList.toggle("hidden", isEdit || isNewStructure || isAddExperience || isHomeExperience);
   el.contribStageDetails.classList.toggle("hidden", !isExperience);
   el.contribSubmitBtn.textContent = isEdit
     ? "Enregistrer les modifications"
@@ -2360,7 +2546,7 @@ function setContributionMode(mode) {
       ? "Enregistrer la structure"
     : isAddContact
       ? "Enregistrer le contact"
-      : isAddExperience
+      : isAddExperience || isHomeExperience
         ? "Enregistrer l'expérience"
       : "Enregistrer ma contribution";
 
@@ -2386,9 +2572,9 @@ function setContributionMode(mode) {
   contactFieldNames.forEach((name) => {
     const fields = [...el.contribForm.querySelectorAll(`[name="${name}"]`)];
     fields.forEach((field) => {
-      if ("required" in field && name === "genre") field.required = !isEdit;
-      if ("disabled" in field) field.disabled = isEdit;
-      if (isEdit) {
+      if ("required" in field && name === "genre") field.required = !isEdit && !isHomeExperience;
+      if ("disabled" in field) field.disabled = isEdit || isHomeExperience || isAddExperience;
+      if (isEdit || isHomeExperience || isAddExperience) {
         if (field.type === "checkbox" || field.type === "radio") field.checked = false;
         else if ("value" in field) field.value = "";
       }
@@ -2413,6 +2599,9 @@ function setContributionMode(mode) {
   });
 
   updateDurationFieldState();
+  if (state.contributionMode === "new_structure") updateDuplicateSuggestion();
+  else hideDuplicateSuggestion();
+  if (isHomeExperience) renderStructurePickerResults();
 }
 
 function updateDurationFieldState() {
