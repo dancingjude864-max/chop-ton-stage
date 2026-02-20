@@ -89,6 +89,7 @@ const state = {
   editingContactContributionId: null,
   duplicateCandidateId: null,
   ignoredDuplicateCandidateId: null,
+  searchShowAll: false,
 };
 
 const el = {
@@ -152,6 +153,7 @@ const el = {
   lockAccountBtn: document.getElementById("lockAccountBtn"),
   deleteAccountBtn: document.getElementById("deleteAccountBtn"),
   resetFilters: document.getElementById("resetFilters"),
+  showAllSearchResultsBtn: document.getElementById("showAllSearchResultsBtn"),
   filterTypeStructure: document.getElementById("filterTypeStructure"),
   filterTypeStructureList: document.getElementById("filterTypeStructureList"),
   filterAssociation: document.getElementById("filterAssociation"),
@@ -211,6 +213,7 @@ function init() {
 function bindNavigation() {
   el.goSearch.addEventListener("click", () => {
     clearStructureParamInUrl();
+    state.searchShowAll = false;
     showView("search");
     renderResults();
   });
@@ -371,6 +374,11 @@ function bindNavigation() {
     el.filterLocation.value = "";
     el.filterPublicCategory.value = "";
     el.filterKeyword.value = "";
+    state.searchShowAll = false;
+    renderResults();
+  });
+  el.showAllSearchResultsBtn.addEventListener("click", () => {
+    state.searchShowAll = true;
     renderResults();
   });
 
@@ -1633,6 +1641,21 @@ function renderResults() {
   const location = el.filterLocation.value.trim().toLowerCase();
   const keyword = normalizeForSearch(el.filterKeyword.value);
   const structureGroups = getStructureGroups();
+  const hasAnyFilter =
+    Boolean(typeStructure) ||
+    Boolean(association) ||
+    Boolean(secteur) ||
+    Boolean(selectedPublicCategory) ||
+    Boolean(location) ||
+    Boolean(keyword);
+
+  if (!hasAnyFilter && !state.searchShowAll) {
+    el.resultMeta.textContent = `${structureGroups.length} structure(s) disponibles.`;
+    el.results.innerHTML =
+      '<div class="rounded-xl border border-indigo-300/45 bg-slate-950/70 p-4 text-sm text-slate-200">Utilisez les filtres ou cliquez sur "Tout voir".</div>';
+    if (!el.personalView.classList.contains("hidden")) renderPersonalView();
+    return;
+  }
 
   const strictFiltered = structureGroups.filter((group) => {
     const item = group.primary;
