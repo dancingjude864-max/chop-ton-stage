@@ -1631,7 +1631,7 @@ function renderResults() {
   const keyword = normalizeForSearch(el.filterKeyword.value);
   const structureGroups = getStructureGroups();
 
-  const filtered = structureGroups.filter((group) => {
+  const strictFiltered = structureGroups.filter((group) => {
     const item = group.primary;
     const itemType = clean(item?.typeStructure).toLowerCase();
     const itemSecteur = clean(item?.secteur).toLowerCase();
@@ -1653,6 +1653,10 @@ function renderResults() {
 
     return passType && passAssociation && passSecteur && passPublic && passLocation && passKeyword;
   });
+  const filtered =
+    keyword && strictFiltered.length === 0
+      ? structureGroups.filter((group) => matchesFuzzyKeyword(group, keyword))
+      : strictFiltered;
 
   const filteredEntries = filtered.reduce((sum, group) => sum + group.records.length, 0);
   const totalEntries = allRecords().length;
@@ -1666,6 +1670,62 @@ function renderResults() {
 
   el.results.innerHTML = filtered.map(renderCard).join("");
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
+}
+
+function matchesFuzzyKeyword(group, keyword) {
+  const q = normalizeForSearch(keyword);
+  if (!q) return true;
+  if (group.keywordText.includes(q)) return true;
+
+  const queryTokens = tokenizeNormalized(q);
+  if (!queryTokens.length) return group.keywordText.includes(q);
+  const words = Array.isArray(group.keywordWords) ? group.keywordWords : tokenizeNormalized(group.keywordText);
+
+  return queryTokens.every((token) => {
+    if (token.length <= 2) return words.some((word) => word.includes(token));
+    return words.some((word) => {
+      if (word.includes(token) || token.includes(word)) return true;
+      const maxDistance = token.length <= 5 ? 1 : 2;
+      return levenshteinWithinThreshold(word, token, maxDistance);
+    });
+  });
+}
+
+function tokenizeNormalized(value) {
+  return normalizeForSearch(value)
+    .split(/[^a-z0-9]+/)
+    .map((token) => clean(token))
+    .filter((token) => token.length >= 2);
+}
+
+function levenshteinWithinThreshold(a, b, maxDistance) {
+  const s = clean(a);
+  const t = clean(b);
+  if (!s || !t) return false;
+  if (Math.abs(s.length - t.length) > maxDistance) return false;
+
+  const previous = new Array(t.length + 1);
+  const current = new Array(t.length + 1);
+  for (let j = 0; j <= t.length; j += 1) previous[j] = j;
+
+  for (let i = 1; i <= s.length; i += 1) {
+    current[0] = i;
+    let rowMin = current[0];
+    const sChar = s.charAt(i - 1);
+    for (let j = 1; j <= t.length; j += 1) {
+      const cost = sChar === t.charAt(j - 1) ? 0 : 1;
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + cost
+      );
+      if (current[j] < rowMin) rowMin = current[j];
+    }
+    if (rowMin > maxDistance) return false;
+    for (let j = 0; j <= t.length; j += 1) previous[j] = current[j];
+  }
+
+  return previous[t.length] <= maxDistance;
 }
 
 function renderCard(item) {
@@ -2122,6 +2182,7 @@ function getStructureGroups() {
       primary,
       contacts,
       keywordText: normalizeForSearch(group.records.map((r) => searchableRecordText(r)).join(" ")),
+      keywordWords: tokenizeNormalized(group.records.map((r) => searchableRecordText(r)).join(" ")),
       sourceSummary: edit || group.records.some((r) => r.source === "Contribution étudiante")
         ? "Google Sheet + contributions"
         : "Google Sheet",
