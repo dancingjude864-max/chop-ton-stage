@@ -983,8 +983,9 @@ function findSimilarStructureCandidate({ nom, ville, departement }) {
 function getDynamicTypeStructures() {
   const dynamic = new Set(TYPE_STRUCTURES.map((item) => clean(item)));
   allRecords().forEach((record) => {
-    const type = clean(record?.typeStructure);
-    if (type) dynamic.add(type);
+    splitMultiTypeStructureValues(record?.typeStructure).forEach((type) => {
+      if (type) dynamic.add(type);
+    });
   });
   return [...dynamic]
     .map(clean)
@@ -995,8 +996,8 @@ function getDynamicTypeStructures() {
 function refreshTypeStructureSuggestions() {
   const previousFilterValue = clean(el.filterTypeStructure.value);
   const previousContribValue = clean(el.contribTypeStructure.value);
-  const filterSuggestions = getTypeStructureSuggestions(previousFilterValue, 20);
-  const contribSuggestions = getTypeStructureSuggestions(previousContribValue, 20);
+  const filterSuggestions = getTypeStructureSuggestions(getLastMultiTypeToken(previousFilterValue), 20);
+  const contribSuggestions = getTypeStructureSuggestions(getLastMultiTypeToken(previousContribValue), 20);
   setDatalistOptions(el.filterTypeStructureList, filterSuggestions);
   setDatalistOptions(el.contribTypeStructureList, contribSuggestions);
 }
@@ -1088,7 +1089,7 @@ function bindContributionForm() {
       el.contribStatus.className = "text-sm text-red-700";
       return;
     }
-    const typeStructure = clean(data.get("typeStructure"));
+    const typeStructure = normalizeMultiTypeStructureValue(data.get("typeStructure"));
     const isLinkedExperienceMode = state.contributionMode === "experience" || isAddExperienceMode;
 
     const entry = {
@@ -1282,7 +1283,7 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
   const get = (name) => clean(data.get(name));
   const isIdfDepartement = (value) => IDF_DEPARTEMENTS.includes(clean(value));
   const isTwoDigitDept = (value) => /^[0-9]{2}$/.test(clean(value));
-  const hasTypeStructure = get("typeStructure");
+  const hasTypeStructure = splitMultiTypeStructureValues(get("typeStructure")).length > 0;
 
   if (isEdit || isNewStructure) {
     if (!get("nomStructure")) return "Le nom de la structure est requis.";
@@ -1661,7 +1662,7 @@ function renderResults() {
     const itemVille = clean(item?.ville);
     const itemDept = clean(item?.departement);
 
-    const passType = !typeStructure || normalizeForSearch(itemType).includes(normalizeForSearch(typeStructure));
+    const passType = !typeStructure || matchesMultiTypeStructureFilter(itemType, typeStructure);
     const passAssociation =
       !association || normalizeForSearch(itemAssociation).includes(normalizeForSearch(association));
     const passSecteur = !secteur || itemSecteur === secteur;
@@ -1863,6 +1864,44 @@ function getTokenMatchStrength(token, words) {
   return strength;
 }
 
+function splitMultiTypeStructureValues(value) {
+  return clean(value)
+    .split(/[,;\n|]+/)
+    .map((item) => clean(item))
+    .filter(Boolean);
+}
+
+function getLastMultiTypeToken(value) {
+  const parts = clean(value).split(/[,;\n|]+/);
+  return clean(parts[parts.length - 1] || "");
+}
+
+function normalizeMultiTypeStructureValue(value) {
+  const tokens = splitMultiTypeStructureValues(value);
+  if (!tokens.length) return "";
+  const options = getDynamicTypeStructures();
+  const byNormalized = new Map(options.map((item) => [normalizeForSearch(item), item]));
+  const deduped = [];
+  const seen = new Set();
+  tokens.forEach((token) => {
+    const normalized = normalizeForSearch(token);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    deduped.push(byNormalized.get(normalized) || token);
+  });
+  return deduped.join(" | ");
+}
+
+function matchesMultiTypeStructureFilter(itemTypeValue, filterValue) {
+  const itemTypes = splitMultiTypeStructureValues(itemTypeValue).map((item) => normalizeForSearch(item));
+  const requestedTypes = splitMultiTypeStructureValues(filterValue).map((item) => normalizeForSearch(item));
+  if (!requestedTypes.length) return true;
+  if (!itemTypes.length) return false;
+  return requestedTypes.some((requested) =>
+    itemTypes.some((itemType) => itemType.includes(requested) || requested.includes(itemType))
+  );
+}
+
 function tokenizeNormalized(value) {
   return normalizeForSearch(value)
     .split(/[^a-z0-9]+/)
@@ -1905,7 +1944,7 @@ function renderCard(item) {
   const hasConcern = Boolean(clean(structure.structureAlert));
   const effectiveGratification = getEffectiveStructureGratification(item.id, structure);
   const tags = [
-    badge(structure.typeStructure, "bg-cyan-500/20 text-cyan-200"),
+    badgesFromMultiValue(structure.typeStructure, "bg-cyan-500/20 text-cyan-200"),
     badge(structure.secteur, "bg-violet-500/20 text-violet-200"),
     badge(structure.typePublic, "bg-emerald-500/20 text-emerald-200"),
     badge(structure.diplome, "bg-fuchsia-500/20 text-fuchsia-200"),
@@ -1957,6 +1996,12 @@ function badge(text, classes) {
   const value = clean(text);
   if (!value) return "";
   return `<span class="rounded-full px-2 py-1 text-xs font-medium ${classes}">${escapeHtml(value)}</span>`;
+}
+
+function badgesFromMultiValue(value, classes) {
+  const items = splitMultiTypeStructureValues(value);
+  if (!items.length) return "";
+  return items.map((item) => badge(item, classes)).join("");
 }
 
 function setupContribPublicFilter(selectEl, secteurValue) {
@@ -2240,7 +2285,7 @@ function openStructureDetail(structureId) {
   }
 
   const badges = [
-    badge(record.typeStructure, "bg-cyan-500/20 text-cyan-200"),
+    badgesFromMultiValue(record.typeStructure, "bg-cyan-500/20 text-cyan-200"),
     badge(record.secteur, "bg-violet-500/20 text-violet-200"),
     badge(record.typePublic, "bg-emerald-500/20 text-emerald-200"),
     badge(record.diplome, "bg-fuchsia-500/20 text-fuchsia-200"),
