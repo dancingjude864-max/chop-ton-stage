@@ -1501,7 +1501,7 @@ function renderCard(item) {
         <div>
           <p><span class="font-semibold">Localisation:</span> ${escapeHtml(structure.ville || "-")} (${escapeHtml(structure.departement || "-")})</p>
           <p><span class="font-semibold">Gratification:</span> ${escapeHtml(effectiveGratification || "-")}</p>
-          <p><span class="font-semibold">Port du voile:</span> ${escapeHtml(structure.tolereVoile || "Ne sais pas")}</p>
+          <p><span class="font-semibold">Port du voile:</span> ${escapeHtml(structure.tolereVoile || "Pas d'infos")}</p>
           <p><span class="font-semibold">Contacts:</span> ${escapeHtml(item.contactAvailability)}</p>
           ${structure.structureNotes ? `<p><span class="font-semibold">Note:</span> ${escapeHtml(truncateText(structure.structureNotes, 160))}</p>` : ""}
         </div>
@@ -1821,7 +1821,7 @@ function openStructureDetail(structureId) {
     <div>
       <p><span class="font-semibold">Localisation:</span> ${escapeHtml(record.ville || "-")} (${escapeHtml(record.departement || "-")})</p>
       <p><span class="font-semibold">Gratification:</span> ${escapeHtml(effectiveGratification || "-")}</p>
-      <p><span class="font-semibold">Port du voile:</span> ${escapeHtml(record.tolereVoile || "Ne sais pas")}</p>
+      <p><span class="font-semibold">Port du voile:</span> ${escapeHtml(record.tolereVoile || "Pas d'infos")}</p>
     </div>
     <div></div>
   `;
@@ -2259,7 +2259,7 @@ function prefillContributionForm(record) {
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
   setValue("typeStructure", record.typeStructure);
-  setValue("tolereVoile", record.tolereVoile || "Ne sais pas");
+  setValue("tolereVoile", record.tolereVoile || "Pas d'infos");
   setValue("structureNotes", record.structureNotes);
 
   setupContribPublicFilter(el.contribPublic, record.secteur);
