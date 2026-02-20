@@ -17,7 +17,7 @@ const supabaseClient =
     : null;
 
 const SECTEUR_PUBLICS = {
-  "Petite enfance": ["Enfants 0-3 ans", "Enfants 0-6 ans", "Familles"],
+  "Petite enfance": ["Enfants 0-3 ans", "Enfants 0-6 ans", "Enfants", "Familles"],
   "Protection de l'enfance": ["Enfants", "Adolescents", "Familles"],
   "Personnes âgées": ["Personnes âgées"],
   Handicap: ["Enfants", "Adolescents", "Adultes", "Personnes âgées"],
@@ -28,6 +28,17 @@ const SECTEUR_PUBLICS = {
   Logement: ["Adultes", "Familles", "Tous publics"],
   Justice: ["Adolescents", "Adultes"],
 };
+
+const DEFAULT_PUBLIC_OPTIONS = [
+  "Enfants",
+  "Enfants 0-3 ans",
+  "Enfants 0-6 ans",
+  "Adolescents",
+  "Adultes",
+  "Familles",
+  "Tous publics",
+  "Personnes âgées",
+];
 
 const TYPE_STRUCTURES = [
   "MECS",
@@ -1530,7 +1541,7 @@ function badge(text, classes) {
 }
 
 function setupContribPublicFilter(selectEl, secteurValue) {
-  const publics = secteurValue ? SECTEUR_PUBLICS[secteurValue] || [] : [];
+  const publics = getPublicOptionsForSecteur(secteurValue);
 
   selectEl.innerHTML = "";
   const first = document.createElement("option");
@@ -1546,6 +1557,24 @@ function setupContribPublicFilter(selectEl, secteurValue) {
   });
 
   selectEl.disabled = publics.length === 0;
+}
+
+function getPublicOptionsForSecteur(secteurValue) {
+  const raw = clean(secteurValue);
+  if (!raw) return [];
+
+  let publics = SECTEUR_PUBLICS[raw] || [];
+  if (!publics.length) {
+    const target = normalizeForSearch(raw);
+    const matchedKey = Object.keys(SECTEUR_PUBLICS).find(
+      (key) => normalizeForSearch(key) === target
+    );
+    publics = matchedKey ? (SECTEUR_PUBLICS[matchedKey] || []) : [];
+  }
+
+  const base = publics.length ? publics : DEFAULT_PUBLIC_OPTIONS;
+  const withChildren = base.includes("Enfants") ? base : [...base, "Enfants"];
+  return [...new Set(withChildren.map((value) => clean(value)).filter(Boolean))];
 }
 
 function classifyPublicCategories(typePublicValue) {
