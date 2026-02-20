@@ -186,6 +186,8 @@ const el = {
   contribSecteurFields: document.getElementById("contribSecteurFields"),
   addSecteurFieldBtn: document.getElementById("addSecteurFieldBtn"),
   contribPublic: document.getElementById("contribPublic"),
+  contribPublicFields: document.getElementById("contribPublicFields"),
+  addPublicFieldBtn: document.getElementById("addPublicFieldBtn"),
   contribDuplicateAlert: document.getElementById("contribDuplicateAlert"),
   contribDuplicateText: document.getElementById("contribDuplicateText"),
   duplicateOpenExisting: document.getElementById("duplicateOpenExisting"),
@@ -249,6 +251,7 @@ function bindNavigation() {
     setContribTypeStructureValuesFromString("");
     setContribAssociationValuesFromString("");
     setContribSecteurValuesFromString("");
+    setContribPublicValuesFromString("");
     hideDuplicateSuggestion();
     showView("contrib");
     el.contribStatus.textContent = "Renseignez les informations de la structure puis enregistrez.";
@@ -787,13 +790,13 @@ function setupStaticSelects() {
   refreshTypeStructureSuggestions();
   refreshAssociationSuggestions();
 
-  setupContribPublicFilter(el.contribPublic, "");
-
   bindContribMultiFieldInputs();
   setContribTypeStructureValuesFromString("");
   setContribAssociationValuesFromString("");
   bindContribSecteurFields();
+  bindContribPublicFields();
   setContribSecteurValuesFromString("");
+  setContribPublicValuesFromString("");
 
   [...el.contribForm.querySelectorAll('input[name="gratification"]')].forEach((radio) => {
     radio.addEventListener("change", updateDurationFieldState);
@@ -1104,6 +1107,91 @@ function bindContribSecteurFields() {
   addField("");
 }
 
+function bindContribPublicFields() {
+  if (!el.contribPublicFields || !el.addPublicFieldBtn || !el.contribPublic) return;
+
+  const updateButtons = () => {
+    const rows = [...el.contribPublicFields.querySelectorAll(".remove-public-field")];
+    rows.forEach((btn, idx) => btn.classList.toggle("hidden", rows.length === 1 && idx === 0));
+    const selects = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")];
+    selects.forEach((select) => {
+      select.required = selects.length === 1;
+      select.disabled = getPublicOptionsForSecteur(el.contribSecteur.value).length === 0;
+    });
+  };
+
+  const syncPublics = () => {
+    const values = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")]
+      .map((select) => clean(select.value))
+      .filter(Boolean);
+    el.contribPublic.value = values.join(" | ");
+  };
+
+  const refreshOptions = () => {
+    const options = getPublicOptionsForSecteur(el.contribSecteur.value);
+    const selects = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")];
+    selects.forEach((select) => {
+      const selected = clean(select.value);
+      select.innerHTML = "";
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "Sélectionner";
+      select.appendChild(empty);
+      const merged = new Set(options);
+      if (selected && !merged.has(selected)) merged.add(selected);
+      [...merged].forEach((label) => {
+        const opt = document.createElement("option");
+        opt.value = label;
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+      select.value = selected;
+    });
+    updateButtons();
+    syncPublics();
+  };
+
+  const addField = (value = "") => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex items-center gap-2";
+    const select = document.createElement("select");
+    select.className = "contrib-public-input w-full rounded-lg border border-slate-300 px-3 py-2";
+    select.value = clean(value);
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "remove-public-field rounded-lg border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100";
+    removeBtn.textContent = "×";
+    removeBtn.setAttribute("aria-label", "Retirer");
+    wrapper.appendChild(select);
+    wrapper.appendChild(removeBtn);
+    el.contribPublicFields.appendChild(wrapper);
+    refreshOptions();
+    return select;
+  };
+
+  el.addPublicFieldBtn.addEventListener("click", () => {
+    const select = addField("");
+    if (select) select.focus();
+  });
+
+  el.contribPublicFields.addEventListener("change", (event) => {
+    if (!event.target.classList.contains("contrib-public-input")) return;
+    syncPublics();
+  });
+
+  el.contribPublicFields.addEventListener("click", (event) => {
+    const btn = event.target.closest(".remove-public-field");
+    if (!btn) return;
+    const rows = el.contribPublicFields.querySelectorAll(".remove-public-field");
+    if (rows.length <= 1) return;
+    btn.parentElement.remove();
+    refreshOptions();
+  });
+
+  el.contribPublicFields.innerHTML = "";
+  addField("");
+}
+
 function bindContribMultiInput({
   container,
   addBtn,
@@ -1222,6 +1310,28 @@ function setContribSecteurValuesFromString(value) {
   setupContribPublicFilter(el.contribPublic, el.contribSecteur.value);
 }
 
+function setContribPublicValuesFromString(value) {
+  if (!el.contribPublicFields || !el.addPublicFieldBtn || !el.contribPublic) return;
+  const values = splitMultiTypeStructureValues(value);
+  while (el.contribPublicFields.querySelectorAll(".contrib-public-input").length < Math.max(1, values.length)) {
+    el.addPublicFieldBtn.click();
+  }
+  const selects = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")];
+  selects.forEach((select, idx) => {
+    select.value = values[idx] || "";
+  });
+  for (let i = selects.length - 1; i > 0; i -= 1) {
+    if (clean(selects[i].value)) continue;
+    const removeBtn = selects[i].parentElement?.querySelector(".remove-public-field");
+    removeBtn?.click();
+  }
+  setupContribPublicFilter(el.contribPublic, el.contribSecteur.value);
+  const finalValues = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")]
+    .map((select) => clean(select.value))
+    .filter(Boolean);
+  el.contribPublic.value = finalValues.join(" | ");
+}
+
 function setContribMultiFieldValues(container, inputClass, value) {
   if (!container) return;
   const values = splitMultiTypeStructureValues(value);
@@ -1336,6 +1446,10 @@ function bindContributionForm() {
       .map((select) => clean(select.value))
       .filter(Boolean);
     el.contribSecteur.value = secteurValues.join(" | ");
+    const publicValues = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")]
+      .map((select) => clean(select.value))
+      .filter(Boolean);
+    el.contribPublic.value = publicValues.join(" | ");
 
     const data = new FormData(el.contribForm);
     const baseRecord =
@@ -1493,6 +1607,7 @@ function bindContributionForm() {
     setContribTypeStructureValuesFromString("");
     setContribAssociationValuesFromString("");
     setContribSecteurValuesFromString("");
+    setContribPublicValuesFromString("");
 
     if (state.contributionMode === "edit_structure") {
       el.contribStatus.textContent = savedRemotely
@@ -1564,7 +1679,7 @@ function validateContributionForm({ mode, data, postes, baseRecord }) {
     if (!validDepartement) return "Sélectionnez un département valide.";
     if (!hasTypeStructure) return "Le type de structure est requis.";
     if (!get("secteur")) return "Le secteur est requis.";
-    if (!get("typePublic")) return "Le type de public est requis.";
+    if (splitMultiTypeStructureValues(get("typePublic")).length === 0) return "Le type de public est requis.";
   }
 
   if (isExperience) {
@@ -2222,7 +2337,7 @@ function renderCard(item) {
   const tags = [
     badgesFromMultiValue(structure.typeStructure, "bg-cyan-500/20 text-cyan-200"),
     badgesFromMultiValue(structure.secteur, "bg-violet-500/20 text-violet-200"),
-    badge(structure.typePublic, "bg-emerald-500/20 text-emerald-200"),
+    badgesFromMultiValue(structure.typePublic, "bg-emerald-500/20 text-emerald-200"),
     badge(structure.diplome, "bg-fuchsia-500/20 text-fuchsia-200"),
   ]
     .filter(Boolean)
@@ -2282,21 +2397,28 @@ function badgesFromMultiValue(value, classes) {
 
 function setupContribPublicFilter(selectEl, secteurValue) {
   const publics = getPublicOptionsForSecteur(secteurValue);
-
-  selectEl.innerHTML = "";
-  const first = document.createElement("option");
-  first.value = "";
-  first.textContent = "Sélectionner";
-  selectEl.appendChild(first);
-
-  publics.forEach((p) => {
-    const opt = document.createElement("option");
-    opt.value = p;
-    opt.textContent = p;
-    selectEl.appendChild(opt);
+  if (!el.contribPublicFields) return;
+  const selects = [...el.contribPublicFields.querySelectorAll(".contrib-public-input")];
+  selects.forEach((select) => {
+    const selected = clean(select.value);
+    select.innerHTML = "";
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = "Sélectionner";
+    select.appendChild(first);
+    const merged = new Set(publics);
+    if (selected && !merged.has(selected)) merged.add(selected);
+    [...merged].forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      select.appendChild(opt);
+    });
+    select.value = selected;
+    select.disabled = publics.length === 0;
   });
-
-  selectEl.disabled = publics.length === 0;
+  const values = selects.map((select) => clean(select.value)).filter(Boolean);
+  el.contribPublic.value = values.join(" | ");
 }
 
 function getPublicOptionsForSecteur(secteurValue) {
@@ -2567,7 +2689,7 @@ function openStructureDetail(structureId) {
   const badges = [
     badgesFromMultiValue(record.typeStructure, "bg-cyan-500/20 text-cyan-200"),
     badgesFromMultiValue(record.secteur, "bg-violet-500/20 text-violet-200"),
-    badge(record.typePublic, "bg-emerald-500/20 text-emerald-200"),
+    badgesFromMultiValue(record.typePublic, "bg-emerald-500/20 text-emerald-200"),
     badge(record.diplome, "bg-fuchsia-500/20 text-fuchsia-200"),
   ]
     .filter(Boolean)
@@ -3048,8 +3170,7 @@ function prefillContributionForm(record) {
   setValue("structureNotes", record.structureNotes);
 
   setupContribPublicFilter(el.contribPublic, el.contribSecteur.value || record.secteur);
-  ensureSelectOptionExists(el.contribPublic, record.typePublic, record.typePublic);
-  setValue("typePublic", record.typePublic);
+  setContribPublicValuesFromString(record.typePublic);
 
   if (state.contributionMode === "edit_structure" || state.contributionMode === "add_contact") {
     setValue("diplome", "");
@@ -3138,12 +3259,13 @@ function setContributionMode(mode) {
       if ("disabled" in field) field.disabled = isAddContact || isAddExperience;
     });
   });
-  [...el.contribForm.querySelectorAll(".contrib-type-structure-input, .contrib-association-input, .contrib-secteur-input")].forEach((field) => {
+  [...el.contribForm.querySelectorAll(".contrib-type-structure-input, .contrib-association-input, .contrib-secteur-input, .contrib-public-input")].forEach((field) => {
     if ("disabled" in field) field.disabled = isAddContact || isAddExperience;
   });
   if (el.addTypeStructureFieldBtn) el.addTypeStructureFieldBtn.disabled = isAddContact || isAddExperience;
   if (el.addAssociationFieldBtn) el.addAssociationFieldBtn.disabled = isAddContact || isAddExperience;
   if (el.addSecteurFieldBtn) el.addSecteurFieldBtn.disabled = isAddContact || isAddExperience;
+  if (el.addPublicFieldBtn) el.addPublicFieldBtn.disabled = isAddContact || isAddExperience;
 
   const contactFieldNames = ["genre", "email", "telephone", "postes"];
   contactFieldNames.forEach((name) => {
