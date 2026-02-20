@@ -55,19 +55,11 @@
     </button>
 
     <header class="mx-auto max-w-6xl px-4 pt-24 pb-2 sm:px-6">
-      <div class="mb-4 flex justify-end gap-2">
-        <button id="goPersonal" class="rounded-lg border border-indigo-400/40 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 hover:bg-slate-800">
-          Mon espace
-        </button>
-        <button id="goAccount" class="rounded-lg border border-indigo-400/40 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 hover:bg-slate-800">
-          Compte
-        </button>
-      </div>
       <h1 class="text-center text-5xl font-black tracking-tight text-indigo-200 sm:text-7xl">
         CHOP' TON STAGE
       </h1>
       <p class="mx-auto mt-4 max-w-2xl text-center text-sm text-slate-300 sm:text-base">
-        Plateforme collaborative pour trouver un stage en travail social.
+        Plateforme collaborative pour trouver un stage en travail social en île de france.
       </p>
       <p class="mt-3 text-center text-xs text-slate-400">
         <a href="./legal.html" class="underline decoration-indigo-300/60 underline-offset-2 hover:text-indigo-200">
@@ -109,19 +101,19 @@
       <section id="searchView" class="panel hidden rounded-3xl border border-indigo-300/35 bg-slate-800/50 p-5 shadow-lg shadow-indigo-900/30 sm:p-8">
         <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-wrap gap-2">
-            <button id="searchGoPersonal" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
-              Mon espace
-            </button>
-            <button id="searchGoAccount" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
-              Compte
-            </button>
-          </div>
-          <div class="flex flex-wrap gap-2">
             <button id="backFromSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
               Retour accueil
             </button>
             <button id="resetFilters" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
               Réinitialiser filtres
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="searchGoPersonal" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+              Mon espace
+            </button>
+            <button id="searchGoAccount" class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100">
+              Compte
             </button>
           </div>
         </div>
@@ -432,6 +424,15 @@
 
               <label class="text-sm font-medium">Type de public *
                 <select required id="contribPublic" name="typePublic" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" disabled></select>
+              </label>
+
+              <label class="text-sm font-medium">La structure tolère le port du voile
+                <select name="tolereVoile" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="">Ne sais pas</option>
+                  <option value="Oui">Oui</option>
+                  <option value="Non">Non</option>
+                  <option value="Ne sais pas">Ne sais pas</option>
+                </select>
               </label>
 
               <label class="text-sm font-medium sm:col-span-2">Note sur la structure (optionnel)

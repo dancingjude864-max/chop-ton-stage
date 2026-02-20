@@ -214,18 +214,22 @@ function bindNavigation() {
     const suffix = params.toString() ? `?${params.toString()}` : "";
     window.location.href = `./tableur-local.html${suffix}`;
   });
-  el.goPersonal.addEventListener("click", () => {
-    showView("personal");
-    renderPersonalView();
-  });
+  if (el.goPersonal) {
+    el.goPersonal.addEventListener("click", () => {
+      showView("personal");
+      renderPersonalView();
+    });
+  }
   el.searchGoPersonal.addEventListener("click", () => {
     showView("personal");
     renderPersonalView();
   });
-  el.goAccount.addEventListener("click", () => {
-    showView("account");
-    renderAccountState();
-  });
+  if (el.goAccount) {
+    el.goAccount.addEventListener("click", () => {
+      showView("account");
+      renderAccountState();
+    });
+  }
   el.searchGoAccount.addEventListener("click", () => {
     showView("account");
     renderAccountState();
@@ -904,6 +908,7 @@ function bindContributionForm() {
         (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.departement) : clean(data.get("departement"))
       ),
       typePublic: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.typePublic) : clean(data.get("typePublic")),
+      tolereVoile: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.tolereVoile) : clean(data.get("tolereVoile")),
       structureNotes: (isAddContactMode || isAddExperienceMode) ? clean(baseRecord?.structureNotes) : clean(data.get("structureNotes")),
       duree: isAddContactMode ? clean(baseRecord?.duree) : clean(data.get("duree")),
       diplome: isAddContactMode ? clean(baseRecord?.diplome) : clean(data.get("diplome")),
@@ -929,6 +934,7 @@ function bindContributionForm() {
         nomStructure: entry.nomStructure,
         ville: entry.ville,
         typePublic: entry.typePublic,
+        tolereVoile: entry.tolereVoile,
         structureNotes: entry.structureNotes,
       };
 
@@ -961,8 +967,11 @@ function bindContributionForm() {
       const structureRecord = { ...entry, structureId, source: "Google Sheet" };
       if (supabaseClient) {
         savedRemotely = await persistStructureRecord(structureId, structureRecord);
-        if (clean(structureRecord.structureNotes)) {
-          await persistStructureEdit(structureId, { structureNotes: structureRecord.structureNotes });
+        if (clean(structureRecord.structureNotes) || clean(structureRecord.tolereVoile)) {
+          await persistStructureEdit(structureId, {
+            structureNotes: structureRecord.structureNotes,
+            tolereVoile: structureRecord.tolereVoile,
+          });
         }
       } else {
         savedRemotely = false;
@@ -1197,6 +1206,7 @@ async function loadStructuresFromSupabase() {
       gratification: clean(row.gratification),
       ville: normalizeVilleByDepartement(clean(row.ville), clean(row.departement)),
       typePublic: clean(row.type_public),
+      tolereVoile: "",
       duree: clean(row.duree_stage),
       diplome: clean(row.diplome_associe),
       missions: clean(row.missions),
@@ -1356,6 +1366,7 @@ function contributionFingerprint(entry) {
     clean(entry.gratification),
     clean(entry.ville),
     clean(entry.typePublic),
+    clean(entry.tolereVoile),
     clean(entry.structureNotes),
     clean(entry.duree),
     clean(entry.diplome),
@@ -1387,6 +1398,7 @@ function toRecord(cols) {
     gratification: normalizeOuiNon(cols[9]),
     ville,
     typePublic: clean(cols[11]),
+    tolereVoile: clean(cols[17]),
     duree: clean(cols[12]),
     diplome: clean(cols[13]),
     missions: clean(cols[14]),
@@ -1489,6 +1501,7 @@ function renderCard(item) {
         <div>
           <p><span class="font-semibold">Localisation:</span> ${escapeHtml(structure.ville || "-")} (${escapeHtml(structure.departement || "-")})</p>
           <p><span class="font-semibold">Gratification:</span> ${escapeHtml(effectiveGratification || "-")}</p>
+          <p><span class="font-semibold">Port du voile:</span> ${escapeHtml(structure.tolereVoile || "Ne sais pas")}</p>
           <p><span class="font-semibold">Contacts:</span> ${escapeHtml(item.contactAvailability)}</p>
           ${structure.structureNotes ? `<p><span class="font-semibold">Note:</span> ${escapeHtml(truncateText(structure.structureNotes, 160))}</p>` : ""}
         </div>
@@ -1672,6 +1685,7 @@ function searchableRecordText(item) {
     item.gratification,
     item.ville,
     item.typePublic,
+    item.tolereVoile,
     item.structureNotes,
     item.structureAlert,
     item.duree,
@@ -1807,6 +1821,7 @@ function openStructureDetail(structureId) {
     <div>
       <p><span class="font-semibold">Localisation:</span> ${escapeHtml(record.ville || "-")} (${escapeHtml(record.departement || "-")})</p>
       <p><span class="font-semibold">Gratification:</span> ${escapeHtml(effectiveGratification || "-")}</p>
+      <p><span class="font-semibold">Port du voile:</span> ${escapeHtml(record.tolereVoile || "Ne sais pas")}</p>
     </div>
     <div></div>
   `;
@@ -2199,6 +2214,7 @@ async function deleteStructureAndRelatedData(structureId, record) {
     nomStructure: clean(record?.nomStructure),
     departement: clean(record?.departement),
     ville: clean(record?.ville),
+    tolereVoile: clean(record?.tolereVoile),
     structureAlert: clean(record?.structureAlert),
     structureNotes: clean(record?.structureNotes),
   };
@@ -2243,6 +2259,7 @@ function prefillContributionForm(record) {
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
   setValue("typeStructure", record.typeStructure);
+  setValue("tolereVoile", record.tolereVoile || "Ne sais pas");
   setValue("structureNotes", record.structureNotes);
 
   setupContribPublicFilter(el.contribPublic, record.secteur);
@@ -2325,6 +2342,7 @@ function setContributionMode(mode) {
     "typeStructure",
     "secteur",
     "typePublic",
+    "tolereVoile",
     "structureNotes",
   ];
   structureFieldNames.forEach((name) => {
