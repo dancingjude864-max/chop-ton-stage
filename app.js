@@ -841,8 +841,7 @@ function renderStructurePickerResults() {
   }
   const q = normalizeForSearch(el.contribStructureSearch.value);
   if (!q) {
-    el.contribStructureSearchResults.innerHTML =
-      '<p class="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">Commencez à écrire pour voir des structures.</p>';
+    el.contribStructureSearchResults.innerHTML = "";
     return;
   }
   const groups = getStructureGroups();
