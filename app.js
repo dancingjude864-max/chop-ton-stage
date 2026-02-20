@@ -153,7 +153,6 @@ const el = {
   lockAccountBtn: document.getElementById("lockAccountBtn"),
   deleteAccountBtn: document.getElementById("deleteAccountBtn"),
   resetFilters: document.getElementById("resetFilters"),
-  showAllSearchResultsBtn: document.getElementById("showAllSearchResultsBtn"),
   filterTypeStructure: document.getElementById("filterTypeStructure"),
   filterTypeStructureList: document.getElementById("filterTypeStructureList"),
   filterAssociation: document.getElementById("filterAssociation"),
@@ -375,10 +374,6 @@ function bindNavigation() {
     el.filterPublicCategory.value = "";
     el.filterKeyword.value = "";
     state.searchShowAll = false;
-    renderResults();
-  });
-  el.showAllSearchResultsBtn.addEventListener("click", () => {
-    state.searchShowAll = true;
     renderResults();
   });
 
@@ -1652,7 +1647,7 @@ function renderResults() {
   if (!hasAnyFilter && !state.searchShowAll) {
     el.resultMeta.textContent = `${structureGroups.length} structure(s) disponibles.`;
     el.results.innerHTML =
-      '<div class="rounded-xl border border-indigo-300/45 bg-slate-950/70 p-4 text-sm text-slate-200">Utilisez les filtres ou cliquez sur "Tout voir".</div>';
+      '<div class="rounded-xl border border-indigo-300/45 bg-slate-950/70 p-4 text-sm text-slate-200"><button id="showAllSearchResultsInline" class="rounded-lg border border-cyan-300 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/10">Tout voir</button></div>';
     if (!el.personalView.classList.contains("hidden")) renderPersonalView();
     return;
   }
@@ -2035,6 +2030,11 @@ function getStructureUrl(item) {
 }
 
 function onResultsClick(event) {
+  if (event.target.closest("#showAllSearchResultsInline")) {
+    state.searchShowAll = true;
+    renderResults();
+    return;
+  }
   if (event.target.closest("[data-track-control]")) return;
   const card = event.target.closest(".structure-card");
   if (!card) return;
