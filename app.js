@@ -2202,13 +2202,18 @@ function getStructureGroups() {
     if (isStructureDeleted(edit)) return null;
     const primary = edit ? { ...rawPrimary, ...edit } : rawPrimary;
     const contacts = extractContacts(group.records, edit);
+    const searchableText = normalizeForSearch(
+      [searchableRecordText(primary), ...group.records.map((r) => searchableRecordText(r))]
+        .map(clean)
+        .join(" ")
+    );
     return {
       id: group.id,
       records: group.records,
       primary,
       contacts,
-      keywordText: normalizeForSearch(group.records.map((r) => searchableRecordText(r)).join(" ")),
-      keywordWords: tokenizeNormalized(group.records.map((r) => searchableRecordText(r)).join(" ")),
+      keywordText: searchableText,
+      keywordWords: tokenizeNormalized(searchableText),
       sourceSummary: edit || group.records.some((r) => r.source === "Contribution étudiante")
         ? "Google Sheet + contributions"
         : "Google Sheet",
