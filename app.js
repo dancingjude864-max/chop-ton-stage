@@ -840,19 +840,22 @@ function renderStructurePickerResults() {
     return;
   }
   const q = normalizeForSearch(el.contribStructureSearch.value);
+  if (!q) {
+    el.contribStructureSearchResults.innerHTML =
+      '<p class="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">Commencez à écrire pour voir des structures.</p>';
+    return;
+  }
   const groups = getStructureGroups();
-  const matches = !q
-    ? groups.slice(0, 8)
-    : groups
-        .filter((group) => {
-          const text = normalizeForSearch(
-            [group.primary.nomStructure, group.primary.association, group.primary.ville, group.primary.departement]
-              .map(clean)
-              .join(" ")
-          );
-          return text.includes(q);
-        })
-        .slice(0, 8);
+  const matches = groups
+    .filter((group) => {
+      const text = normalizeForSearch(
+        [group.primary.nomStructure, group.primary.association, group.primary.ville, group.primary.departement]
+          .map(clean)
+          .join(" ")
+      );
+      return text.includes(q);
+    })
+    .slice(0, 8);
 
   if (!matches.length) {
     el.contribStructureSearchResults.innerHTML =
