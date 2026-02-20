@@ -123,6 +123,7 @@ const el = {
   detailFlagMenu: document.getElementById("detailFlagMenu"),
   detailReportErrorBtn: document.getElementById("detailReportErrorBtn"),
   detailReportConcernBtn: document.getElementById("detailReportConcernBtn"),
+  detailClearConcernBtn: document.getElementById("detailClearConcernBtn"),
   detailDeleteStructureBtn: document.getElementById("detailDeleteStructureBtn"),
   detailName: document.getElementById("detailName"),
   detailAssociation: document.getElementById("detailAssociation"),
@@ -368,6 +369,7 @@ function bindNavigation() {
   });
   el.detailReportErrorBtn.addEventListener("click", onReportStructureError);
   el.detailReportConcernBtn.addEventListener("click", onReportStructureConcern);
+  el.detailClearConcernBtn.addEventListener("click", onClearStructureConcern);
   el.detailDeleteStructureBtn.addEventListener("click", onDeleteStructureFromDetail);
   el.concernCancelBtn.addEventListener("click", closeConcernModal);
   el.concernSaveBtn.addEventListener("click", onSaveConcernReport);
@@ -3010,6 +3012,41 @@ async function onReportStructureConcern() {
   const structureId = clean(state.activeStructureId);
   if (!structureId) return;
   openConcernModal(structureId);
+}
+
+async function onClearStructureConcern() {
+  closeFlagMenu();
+  const structureId = clean(state.activeStructureId);
+  if (!structureId) return;
+  const group = findStructureGroupById(structureId);
+  if (!group) return;
+
+  const hasConcern = Boolean(clean(group.primary?.structureAlert));
+  if (!hasConcern) {
+    window.alert("Aucun signalement à supprimer pour cette structure.");
+    return;
+  }
+
+  const confirmed = window.confirm("Supprimer le signalement de cette structure ?");
+  if (!confirmed) return;
+
+  const previousEdit =
+    state.structureEdits[structureId] && typeof state.structureEdits[structureId] === "object"
+      ? state.structureEdits[structureId]
+      : {};
+  const payload = { ...previousEdit, structureAlert: "" };
+  state.structureEdits[structureId] = payload;
+  const saved = await persistStructureEdit(structureId, payload);
+  saveStructureEdits(state.structureEdits);
+
+  if (!el.searchView.classList.contains("hidden")) renderResults();
+  if (state.activeStructureId) openStructureDetail(state.activeStructureId);
+
+  if (!saved) {
+    window.alert("Signalement retiré localement, mais la sauvegarde en ligne a échoué.");
+    return;
+  }
+  window.alert("Signalement supprimé.");
 }
 
 async function onSaveConcernReport() {
