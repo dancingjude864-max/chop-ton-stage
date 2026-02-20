@@ -23,6 +23,7 @@ const SECTEUR_PUBLICS = {
   Handicap: ["Enfants", "Adolescents", "Adultes", "Personnes âgées"],
   "Précarité/Exclusion": ["Adultes", "Familles", "Tous publics"],
   "Santé mentale": ["Adolescents", "Adultes", "Tous publics"],
+  Psychiatrie: ["Adolescents", "Adultes", "Tous publics"],
   Addictions: ["Adolescents", "Adultes", "Tous publics"],
   Insertion: ["Adolescents", "Adultes"],
   Logement: ["Adultes", "Familles", "Tous publics"],
