@@ -90,6 +90,7 @@ const state = {
   duplicateCandidateId: null,
   ignoredDuplicateCandidateId: null,
   searchShowAll: false,
+  contribTypeStructureTokens: [],
 };
 
 const el = {
@@ -175,6 +176,8 @@ const el = {
   contribStageDetails: document.getElementById("contribStageDetails"),
   contribSubmitBtn: document.getElementById("contribSubmitBtn"),
   contribTypeStructure: document.getElementById("contribTypeStructure"),
+  contribTypeStructureInput: document.getElementById("contribTypeStructureInput"),
+  contribTypeStructureChips: document.getElementById("contribTypeStructureChips"),
   contribTypeStructureList: document.getElementById("contribTypeStructureList"),
   contribAssociation: document.getElementById("contribAssociation"),
   contribAssociationList: document.getElementById("contribAssociationList"),
@@ -240,6 +243,7 @@ function bindNavigation() {
     state.contributionMode = "new_structure";
     setContributionMode("new_structure");
     el.contribForm.reset();
+    setContribTypeStructureTokensFromValue("");
     setupContribPublicFilter(el.contribPublic, "");
     hideDuplicateSuggestion();
     showView("contrib");
@@ -786,9 +790,8 @@ function setupStaticSelects() {
     setupContribPublicFilter(el.contribPublic, el.contribSecteur.value);
   });
 
-  el.contribTypeStructure.addEventListener("input", () => {
-    refreshTypeStructureSuggestions();
-  });
+  bindContribTypeStructureTagInput();
+  setContribTypeStructureTokensFromValue("");
   el.contribAssociation.addEventListener("input", () => {
     refreshAssociationSuggestions();
   });
@@ -995,11 +998,118 @@ function getDynamicTypeStructures() {
 
 function refreshTypeStructureSuggestions() {
   const previousFilterValue = clean(el.filterTypeStructure.value);
-  const previousContribValue = clean(el.contribTypeStructure.value);
+  const previousContribValue = clean(el.contribTypeStructureInput.value);
   const filterSuggestions = getTypeStructureSuggestions(getLastMultiTypeToken(previousFilterValue), 20);
   const contribSuggestions = getTypeStructureSuggestions(getLastMultiTypeToken(previousContribValue), 20);
   setDatalistOptions(el.filterTypeStructureList, filterSuggestions);
   setDatalistOptions(el.contribTypeStructureList, contribSuggestions);
+}
+
+function bindContribTypeStructureTagInput() {
+  if (!el.contribTypeStructureInput || !el.contribTypeStructureChips) return;
+
+  const commitFromInput = () => {
+    addContribTypeStructureToken(el.contribTypeStructureInput.value);
+    el.contribTypeStructureInput.value = "";
+    refreshTypeStructureSuggestions();
+  };
+
+  el.contribTypeStructureInput.addEventListener("input", () => {
+    refreshTypeStructureSuggestions();
+  });
+
+  el.contribTypeStructureInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === "," || event.key === ";") {
+      event.preventDefault();
+      commitFromInput();
+    }
+    if (event.key === "Backspace" && !clean(el.contribTypeStructureInput.value)) {
+      if (state.contribTypeStructureTokens.length > 0) {
+        state.contribTypeStructureTokens.pop();
+        syncContribTypeStructureHiddenInput();
+        renderContribTypeStructureChips();
+      }
+    }
+  });
+
+  el.contribTypeStructureInput.addEventListener("blur", () => {
+    if (!clean(el.contribTypeStructureInput.value)) return;
+    commitFromInput();
+  });
+
+  el.contribTypeStructureChips.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-remove-type-token]");
+    if (!btn) return;
+    const tokenToRemove = normalizeForSearch(btn.getAttribute("data-remove-type-token"));
+    state.contribTypeStructureTokens = state.contribTypeStructureTokens.filter(
+      (token) => normalizeForSearch(token) !== tokenToRemove
+    );
+    syncContribTypeStructureHiddenInput();
+    renderContribTypeStructureChips();
+    refreshTypeStructureSuggestions();
+  });
+}
+
+function addContribTypeStructureToken(rawValue) {
+  splitMultiTypeStructureValues(rawValue).forEach((token) => {
+    const canonical = canonicalizeTypeStructureToken(token);
+    if (!canonical) return;
+    const exists = state.contribTypeStructureTokens.some(
+      (existing) => normalizeForSearch(existing) === normalizeForSearch(canonical)
+    );
+    if (exists) return;
+    state.contribTypeStructureTokens.push(canonical);
+  });
+  syncContribTypeStructureHiddenInput();
+  renderContribTypeStructureChips();
+}
+
+function canonicalizeTypeStructureToken(token) {
+  const value = clean(token);
+  if (!value) return "";
+  const normalized = normalizeForSearch(value);
+  const options = getDynamicTypeStructures();
+  const fromList = options.find((item) => normalizeForSearch(item) === normalized);
+  return fromList || value;
+}
+
+function syncContribTypeStructureHiddenInput() {
+  if (!el.contribTypeStructure) return;
+  el.contribTypeStructure.value = state.contribTypeStructureTokens.join(" | ");
+}
+
+function renderContribTypeStructureChips() {
+  if (!el.contribTypeStructureChips) return;
+  if (!state.contribTypeStructureTokens.length) {
+    el.contribTypeStructureChips.innerHTML = "";
+    return;
+  }
+  el.contribTypeStructureChips.innerHTML = state.contribTypeStructureTokens
+    .map(
+      (token) => `
+        <span class="inline-flex items-center gap-1 rounded-full border border-cyan-300/50 bg-cyan-500/15 px-2 py-1 text-xs text-cyan-100">
+          ${escapeHtml(token)}
+          <button
+            type="button"
+            data-remove-type-token="${escapeHtml(token)}"
+            class="rounded-full px-1 text-cyan-100 hover:bg-cyan-400/25"
+            aria-label="Retirer ${escapeHtml(token)}"
+            title="Retirer"
+          >
+            ×
+          </button>
+        </span>
+      `
+    )
+    .join("");
+}
+
+function setContribTypeStructureTokensFromValue(value) {
+  state.contribTypeStructureTokens = [];
+  splitMultiTypeStructureValues(value).forEach((token) => addContribTypeStructureToken(token));
+  if (el.contribTypeStructureInput) el.contribTypeStructureInput.value = "";
+  syncContribTypeStructureHiddenInput();
+  renderContribTypeStructureChips();
 }
 
 function getDynamicAssociations() {
@@ -1065,6 +1175,13 @@ function bindContributionForm() {
       el.contribStatus.textContent = "Sélectionnez au moins une fonction/poste.";
       el.contribStatus.className = "text-sm text-red-700";
       return;
+    }
+
+    // Valide aussi le dernier type en cours de saisie même sans appui sur Entrée.
+    if (el.contribTypeStructureInput && !el.contribTypeStructureInput.disabled) {
+      addContribTypeStructureToken(el.contribTypeStructureInput.value);
+      el.contribTypeStructureInput.value = "";
+      refreshTypeStructureSuggestions();
     }
 
     const data = new FormData(el.contribForm);
@@ -1220,6 +1337,7 @@ function bindContributionForm() {
     }
 
     el.contribForm.reset();
+    setContribTypeStructureTokensFromValue("");
     setupContribPublicFilter(el.contribPublic, "");
 
     if (state.contributionMode === "edit_structure") {
@@ -2762,7 +2880,7 @@ function prefillContributionForm(record) {
   ensureSelectOptionExists(el.contribForm.elements.departement, record.departement, `${record.departement} - Hors IDF`);
   setValue("departement", record.departement);
   setValue("secteur", record.secteur);
-  setValue("typeStructure", record.typeStructure);
+  setContribTypeStructureTokensFromValue(record.typeStructure);
   setValue("tolereVoile", record.tolereVoile || "Pas d'infos");
   setValue("structureNotes", record.structureNotes);
 
@@ -2857,6 +2975,9 @@ function setContributionMode(mode) {
       if ("disabled" in field) field.disabled = isAddContact || isAddExperience;
     });
   });
+  if (el.contribTypeStructureInput) {
+    el.contribTypeStructureInput.disabled = isAddContact || isAddExperience;
+  }
 
   const contactFieldNames = ["genre", "email", "telephone", "postes"];
   contactFieldNames.forEach((name) => {

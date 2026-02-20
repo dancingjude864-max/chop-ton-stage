@@ -432,15 +432,15 @@
               </label>
 
               <label class="text-sm font-medium">Type de structure *
+                <div id="contribTypeStructureChips" class="mt-1 flex flex-wrap gap-2"></div>
                 <input
-                  required
-                  id="contribTypeStructure"
-                  name="typeStructure"
+                  id="contribTypeStructureInput"
                   type="text"
                   list="contribTypeStructureList"
-                  placeholder="Tapez pour chercher (plusieurs: séparés par virgules)"
+                  placeholder="Tapez un type puis Entrée"
                   class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 />
+                <input id="contribTypeStructure" name="typeStructure" type="hidden" />
                 <datalist id="contribTypeStructureList"></datalist>
               </label>
 
