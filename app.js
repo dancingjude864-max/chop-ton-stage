@@ -2671,6 +2671,7 @@ function openStructureDetail(structureId) {
   showView("detail");
 
   if (!record) {
+    setDetailClearConcernAvailability(false);
     el.detailName.textContent = "Structure introuvable";
     el.detailAssociation.textContent = "Cette structure n'a pas été trouvée.";
     el.detailBadges.innerHTML = "";
@@ -2702,6 +2703,7 @@ function openStructureDetail(structureId) {
   el.detailBadges.innerHTML = badges;
   const structureNotes = clean(record.structureNotes);
   const structureAlert = clean(record.structureAlert);
+  setDetailClearConcernAvailability(Boolean(structureAlert));
   const noteParts = [];
   if (structureNotes) {
     noteParts.push(`<p class="mt-1 whitespace-pre-line text-sm text-violet-50">${escapeHtml(structureNotes)}</p>`);
@@ -2736,6 +2738,13 @@ function openStructureDetail(structureId) {
 
   renderContactsForStructure(group);
   renderExperiencesForStructure(structureId);
+}
+
+function setDetailClearConcernAvailability(hasConcern) {
+  if (!el.detailClearConcernBtn) return;
+  el.detailClearConcernBtn.disabled = !hasConcern;
+  el.detailClearConcernBtn.classList.toggle("opacity-40", !hasConcern);
+  el.detailClearConcernBtn.classList.toggle("cursor-not-allowed", !hasConcern);
 }
 
 function renderExperiencesForStructure(structureId) {
