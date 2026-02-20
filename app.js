@@ -1717,7 +1717,18 @@ function rankGroupsByKeywordRelevance(groups, keyword) {
   const q = normalizeForSearch(keyword);
   if (!q) return groups;
   return [...groups].sort((a, b) => {
-    const diff = keywordRelevanceScore(b, q) - keywordRelevanceScore(a, q);
+    const aRank = keywordRelevanceScore(a, q);
+    const bRank = keywordRelevanceScore(b, q);
+    if (bRank.longestMatchedGlobal !== aRank.longestMatchedGlobal) {
+      return bRank.longestMatchedGlobal - aRank.longestMatchedGlobal;
+    }
+    if (bRank.coveredGlobal !== aRank.coveredGlobal) {
+      return bRank.coveredGlobal - aRank.coveredGlobal;
+    }
+    if (bRank.coveredName !== aRank.coveredName) {
+      return bRank.coveredName - aRank.coveredName;
+    }
+    const diff = bRank.score - aRank.score;
     if (diff !== 0) return diff;
     return clean(a.primary?.nomStructure).localeCompare(clean(b.primary?.nomStructure), "fr", {
       sensitivity: "base",
@@ -1727,7 +1738,7 @@ function rankGroupsByKeywordRelevance(groups, keyword) {
 
 function keywordRelevanceScore(group, normalizedKeyword) {
   const q = normalizeForSearch(normalizedKeyword);
-  if (!q) return 0;
+  if (!q) return { score: 0, coveredGlobal: 0, coveredName: 0, longestMatchedGlobal: 0 };
 
   const structureName = normalizeForSearch(group.primary?.nomStructure);
   const structureType = normalizeForSearch(group.primary?.typeStructure);
@@ -1752,6 +1763,7 @@ function keywordRelevanceScore(group, normalizedKeyword) {
   const typeWords = tokenizeNormalized(structureType);
   const associationWords = tokenizeNormalized(association);
   const allWords = Array.isArray(group.keywordWords) ? group.keywordWords : tokenizeNormalized(keywords);
+  const longestTokenLength = queryTokens.reduce((max, token) => Math.max(max, token.length), 0);
 
   const nameTokenScore = scoreTokenSet(queryTokens, nameWords, {
     exact: 320,
@@ -1776,16 +1788,37 @@ function keywordRelevanceScore(group, normalizedKeyword) {
 
   score += nameTokenScore.total + typeTokenScore.total + associationTokenScore.total + globalTokenScore.total;
 
-  // Penalise les résultats qui couvrent mal la requête.
-  const matchedTokens = Math.max(
-    nameTokenScore.matched,
-    typeTokenScore.matched,
-    associationTokenScore.matched,
-    globalTokenScore.matched
-  );
-  score -= (queryTokens.length - matchedTokens) * 120;
+  // Récompense la couverture réelle de la requête, surtout les mots distinctifs.
+  const globalMatchStrengths = queryTokens.map((token) => getTokenMatchStrength(token, allWords));
+  const nameMatchStrengths = queryTokens.map((token) => getTokenMatchStrength(token, nameWords));
+  const coveredGlobal = globalMatchStrengths.filter((value) => value > 0).length;
+  const coveredName = nameMatchStrengths.filter((value) => value > 0).length;
 
-  return score;
+  score += coveredGlobal * 260 + coveredName * 520;
+
+  queryTokens.forEach((token, index) => {
+    const lengthWeight = Math.max(1, token.length - 2);
+    score += globalMatchStrengths[index] * (50 + lengthWeight * 9);
+    score += nameMatchStrengths[index] * (120 + lengthWeight * 14);
+  });
+
+  const longestMatchedGlobal = queryTokens.some(
+    (token, index) => token.length === longestTokenLength && globalMatchStrengths[index] > 0
+  );
+  const longestMatchedName = queryTokens.some(
+    (token, index) => token.length === longestTokenLength && nameMatchStrengths[index] > 0
+  );
+  if (!longestMatchedGlobal) score -= 1600;
+  if (longestMatchedName) score += 700;
+  if (!coveredGlobal) score -= 2200;
+  else if (coveredGlobal < queryTokens.length) score -= (queryTokens.length - coveredGlobal) * 360;
+
+  return {
+    score,
+    coveredGlobal,
+    coveredName,
+    longestMatchedGlobal: longestMatchedGlobal ? 1 : 0,
+  };
 }
 
 function scoreTokenSet(tokens, words, weights) {
@@ -1815,6 +1848,19 @@ function scoreTokenSet(tokens, words, weights) {
   });
 
   return { total, matched };
+}
+
+function getTokenMatchStrength(token, words) {
+  if (!token || !Array.isArray(words) || !words.length) return 0;
+  let strength = 0;
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    if (word === token) return 3;
+    if (word.includes(token) || token.includes(word)) strength = Math.max(strength, 2);
+    const maxDistance = token.length <= 5 ? 1 : 2;
+    if (levenshteinWithinThreshold(word, token, maxDistance)) strength = Math.max(strength, 1);
+  }
+  return strength;
 }
 
 function tokenizeNormalized(value) {
