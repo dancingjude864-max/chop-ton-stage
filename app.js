@@ -1678,18 +1678,19 @@ function renderResults() {
     keyword && strictFiltered.length === 0
       ? structureGroups.filter((group) => matchesFuzzyKeyword(group, keyword))
       : strictFiltered;
+  const ranked = keyword ? rankGroupsByKeywordRelevance(filtered, keyword) : filtered;
 
-  const filteredEntries = filtered.reduce((sum, group) => sum + group.records.length, 0);
+  const filteredEntries = ranked.reduce((sum, group) => sum + group.records.length, 0);
   const totalEntries = allRecords().length;
-  el.resultMeta.textContent = `${filtered.length} structure(s) (${filteredEntries} entrée(s) contacts) sur ${structureGroups.length} structure(s) (${totalEntries} entrée(s) contacts).`;
+  el.resultMeta.textContent = `${ranked.length} structure(s) (${filteredEntries} entrée(s) contacts) sur ${structureGroups.length} structure(s) (${totalEntries} entrée(s) contacts).`;
 
-  if (filtered.length === 0) {
+  if (ranked.length === 0) {
     el.results.innerHTML = '<div class="rounded-xl border border-indigo-300/45 bg-slate-950/70 p-4 text-sm text-slate-200">Aucun résultat pour ces filtres.</div>';
     if (!el.personalView.classList.contains("hidden")) renderPersonalView();
     return;
   }
 
-  el.results.innerHTML = filtered.map(renderCard).join("");
+  el.results.innerHTML = ranked.map(renderCard).join("");
   if (!el.personalView.classList.contains("hidden")) renderPersonalView();
 }
 
@@ -1710,6 +1711,110 @@ function matchesFuzzyKeyword(group, keyword) {
       return levenshteinWithinThreshold(word, token, maxDistance);
     });
   });
+}
+
+function rankGroupsByKeywordRelevance(groups, keyword) {
+  const q = normalizeForSearch(keyword);
+  if (!q) return groups;
+  return [...groups].sort((a, b) => {
+    const diff = keywordRelevanceScore(b, q) - keywordRelevanceScore(a, q);
+    if (diff !== 0) return diff;
+    return clean(a.primary?.nomStructure).localeCompare(clean(b.primary?.nomStructure), "fr", {
+      sensitivity: "base",
+    });
+  });
+}
+
+function keywordRelevanceScore(group, normalizedKeyword) {
+  const q = normalizeForSearch(normalizedKeyword);
+  if (!q) return 0;
+
+  const structureName = normalizeForSearch(group.primary?.nomStructure);
+  const structureType = normalizeForSearch(group.primary?.typeStructure);
+  const association = normalizeForSearch(group.primary?.association);
+  const keywords = clean(group.keywordText);
+  const queryTokens = tokenizeNormalized(q);
+
+  let score = 0;
+  if (structureName === q) score += 2400;
+  else if (structureName.startsWith(q)) score += 2000;
+  else if (structureName.includes(q)) score += 1750;
+
+  if (structureType === q) score += 1200;
+  else if (structureType.includes(q)) score += 900;
+
+  if (association === q) score += 900;
+  else if (association.includes(q)) score += 650;
+
+  if (keywords.includes(q)) score += 450;
+
+  const nameWords = tokenizeNormalized(structureName);
+  const typeWords = tokenizeNormalized(structureType);
+  const associationWords = tokenizeNormalized(association);
+  const allWords = Array.isArray(group.keywordWords) ? group.keywordWords : tokenizeNormalized(keywords);
+
+  const nameTokenScore = scoreTokenSet(queryTokens, nameWords, {
+    exact: 320,
+    includes: 230,
+    fuzzy: 150,
+  });
+  const typeTokenScore = scoreTokenSet(queryTokens, typeWords, {
+    exact: 160,
+    includes: 115,
+    fuzzy: 70,
+  });
+  const associationTokenScore = scoreTokenSet(queryTokens, associationWords, {
+    exact: 150,
+    includes: 105,
+    fuzzy: 65,
+  });
+  const globalTokenScore = scoreTokenSet(queryTokens, allWords, {
+    exact: 65,
+    includes: 45,
+    fuzzy: 25,
+  });
+
+  score += nameTokenScore.total + typeTokenScore.total + associationTokenScore.total + globalTokenScore.total;
+
+  // Penalise les résultats qui couvrent mal la requête.
+  const matchedTokens = Math.max(
+    nameTokenScore.matched,
+    typeTokenScore.matched,
+    associationTokenScore.matched,
+    globalTokenScore.matched
+  );
+  score -= (queryTokens.length - matchedTokens) * 120;
+
+  return score;
+}
+
+function scoreTokenSet(tokens, words, weights) {
+  if (!tokens.length || !words.length) return { total: 0, matched: 0 };
+  let total = 0;
+  let matched = 0;
+
+  tokens.forEach((token) => {
+    let tokenScore = 0;
+    for (let i = 0; i < words.length; i += 1) {
+      const word = words[i];
+      if (word === token) {
+        tokenScore = Math.max(tokenScore, weights.exact);
+        break;
+      }
+      if (word.includes(token) || token.includes(word)) {
+        tokenScore = Math.max(tokenScore, weights.includes);
+        continue;
+      }
+      const maxDistance = token.length <= 5 ? 1 : 2;
+      if (levenshteinWithinThreshold(word, token, maxDistance)) {
+        tokenScore = Math.max(tokenScore, weights.fuzzy);
+      }
+    }
+    if (tokenScore > 0) matched += 1;
+    total += tokenScore;
+  });
+
+  return { total, matched };
 }
 
 function tokenizeNormalized(value) {
